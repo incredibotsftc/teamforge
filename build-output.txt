@@ -1,0 +1,80 @@
+
+> ftc-teamforge@0.1.0 build
+> next build --turbopack
+
+   ▲ Next.js 15.5.4 (Turbopack)
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Finished writing to disk in 241ms
+ ✓ Compiled successfully in 18.2s
+   Linting and checking validity of types ...
+
+./src/app/mentoring/page.tsx
+193:6  Warning: React Hook useEffect has a missing dependency: 'loadTeamStats'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+222:6  Warning: React Hook useEffect has a missing dependency: 'currentSeason.id'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/notebook/BlockNoteEditor.tsx
+14:10  Warning: 'saveNotebookContent' is defined but never used.  @typescript-eslint/no-unused-vars
+25:55  Warning: 'onTitleChange' is defined but never used.  @typescript-eslint/no-unused-vars
+43:9  Warning: 'saveInProgressRef' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+58:15  Warning: 'data' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+160:6  Warning: React Hook useEffect has missing dependencies: 'currentSeason', 'page', and 'team'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+263:6  Warning: React Hook useCallback has an unnecessary dependency: 'page.id'. Either exclude it or remove the dependency array.  react-hooks/exhaustive-deps
+337:6  Warning: React Hook useEffect has missing dependencies: 'linkedEntityId', 'linkedEntityType', 'page', and 'title'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+420:6  Warning: React Hook useEffect has a missing dependency: 'page'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+428:6  Warning: React Hook useEffect has a missing dependency: 'page'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+439:6  Warning: React Hook useEffect has a missing dependency: 'page'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/SeasonsManagement.tsx
+42:10  Warning: 'editingSeasonId' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/23) ...
+   Generating static pages (5/23) 
+   Generating static pages (11/23) 
+   Generating static pages (17/23) 
+ ✓ Generating static pages (23/23)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                         Size  First Load JS
+┌ ○ /                            51.4 kB         209 kB
+├ ○ /_not-found                      0 B         157 kB
+├ ƒ /api/admin/delete-team           0 B            0 B
+├ ƒ /api/events                      0 B            0 B
+├ ƒ /api/events/[eventId]            0 B            0 B
+├ ƒ /api/migrate-discord             0 B            0 B
+├ ƒ /api/seasons/set-current         0 B            0 B
+├ ƒ /api/setup-database              0 B            0 B
+├ ƒ /api/team/invites                0 B            0 B
+├ ƒ /api/team/join                   0 B            0 B
+├ ƒ /api/user-settings               0 B            0 B
+├ ○ /budget                       152 kB         333 kB
+├ ○ /calendar                     143 kB         792 kB
+├ ƒ /calendar/[eventId]/edit     2.61 kB         662 kB
+├ ○ /calendar/create             18.9 kB         662 kB
+├ ○ /dashboard                    118 kB         322 kB
+├ ○ /join                        19.7 kB         177 kB
+├ ○ /mentoring                     15 kB         634 kB
+├ ƒ /mentoring/[teamId]          8.07 kB         212 kB
+├ ○ /notebook                    47.2 kB         235 kB
+├ ƒ /notebook/[noteId]           55.9 kB         643 kB
+├ ○ /scouting                    3.48 kB         207 kB
+├ ○ /settings                    9.73 kB         214 kB
+├ ○ /tasks                       59.9 kB         655 kB
+└ ○ /team                        17.6 kB         230 kB
++ First Load JS shared by all     178 kB
+  ├ chunks/00bcba05fbac4add.js     13 kB
+  ├ chunks/6c8f3011cf3e0f82.js   39.8 kB
+  ├ chunks/755ac26000f1003a.js   10.9 kB
+  ├ chunks/bbf89c5280eb1f0c.js   17.3 kB
+  ├ chunks/c16efd9677d8c131.js   55.5 kB
+  ├ chunks/3ab10f23e3b3f24b.css  20.5 kB
+  └ other shared chunks (total)  21.4 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -1,0 +1,16 @@
+My name is Hridhaan and I will provide instructions on how to setup FTC TeamForge or your team.
+
+In order to setup FTC Team Forge you will need 3 things - 
+1. A GitHub account to fork the codebase
+2. A Supabase database which will store all your project data
+3. A cloud provider to host your app. We recommend Vercel for its generous free tier
+
+Additionally if you want to use the Scouting module of FTC TeamForge you will also need a API key from First. More on that later.
+
+Let's get started.
+
+First, go to GitHub and create an account if you don't already have one. Then visit our public repository and fork our codebase. Forking will help you make changes to the code for your team although we ask that if your change is something that can help other FTC teams, to please submit a pull request back into our repository.
+
+Next, go to Supabase.com and create an account. Supabase is an online database with a generous free tier sufficient for most FTC teams. Once in Supabase, create or choose an organization and then click on "New Project" to create a database. Name it teamforge.
+
+Once the database is created, we will need 3 values from the database which are the database URL, the anon key and they secret key. To get the database URL
