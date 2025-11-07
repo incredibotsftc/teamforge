@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import { DashboardLayout } from '@/components/DashboardLayout'
+import { AddTeamSheet } from './AddTeamSheet'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
@@ -127,18 +128,6 @@ function calculateDuration(startTime: string | null, endTime: string | null): st
   }
 }
 
-// Generate years array once, outside component
-const generateYearsArray = () => {
-  const currentYear = new Date().getFullYear()
-  const years = []
-  for (let year = currentYear; year >= currentYear - 20; year--) {
-    years.push(year)
-  }
-  return years
-}
-
-const YEARS_ARRAY = generateYearsArray()
-
 export default function MentoringPage() {
   const { user } = useAuth()
   const { team, teamMembers, currentSeason } = useAppData()
@@ -148,13 +137,22 @@ export default function MentoringPage() {
   const [teamSessions, setTeamSessions] = useState<SessionRow[]>([])
   const [hasAutoSelected, setHasAutoSelected] = useState(false)
 
+  // Memoize filtered team members to prevent expensive filtering on every render
+  const { mentorsAndAdmins, students } = React.useMemo(() => {
+    const mentorsAndAdmins = teamMembers.filter(m => ["mentor", "admin"].includes(m.role.toLowerCase()))
+    const students = teamMembers.filter(m => !["mentor", "admin"].includes(m.role.toLowerCase()))
+    return { mentorsAndAdmins, students }
+  }, [teamMembers])
+
+  // Create a lookup map for O(1) team member access instead of O(n) finds
+  const teamMembersMap = React.useMemo(() => {
+    return new Map(teamMembers.map(m => [m.id, m]))
+  }, [teamMembers])
+
 
   // Add/Edit Team dialog state
   const [showTeamDialog, setShowTeamDialog] = useState(false)
-  const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
-  const [newTeamName, setNewTeamName] = useState('')
-  const [newTeamNumber, setNewTeamNumber] = useState('')
-  const [newTeamMentoringSince, setNewTeamMentoringSince] = useState('')
+  const [editingTeam, setEditingTeam] = useState<{ id: string; name: string; number?: number; mentoring_since?: number } | null>(null)
 
   // Add Session dialog state
   const [showAddSession, setShowAddSession] = useState(false)
@@ -519,101 +517,41 @@ export default function MentoringPage() {
     setIsNotebookOpen(true)
   }
 
-  const openTeamDialog = (team?: { id: string; name: string; number?: number; mentoring_since?: number }) => {
-    if (team) {
-      // Edit mode
-      setEditingTeamId(team.id)
-      setNewTeamName(team.name)
-      setNewTeamNumber(team.number?.toString() || '')
-      setNewTeamMentoringSince(team.mentoring_since?.toString() || '')
-    } else {
-      // Add mode
-      setEditingTeamId(null)
-      setNewTeamName('')
-      setNewTeamNumber('')
-      setNewTeamMentoringSince('')
-    }
+  const openTeamDialog = React.useCallback((team?: { id: string; name: string; number?: number; mentoring_since?: number }) => {
+    setEditingTeam(team || null)
     setShowTeamDialog(true)
-  }
+  }, [])
 
-  const handleSaveTeam = async () => {
-    if (!user) {
-      alert('You must be logged in to save a team')
-      return
+  // Callback to reload teams after adding/editing
+  const handleTeamSaved = React.useCallback(async () => {
+    if (!team?.id || !currentSeason?.id) return
+
+    const teamsResp = await supabase
+      .from('mentoring_teams')
+      .select('id, team_name, team_number, mentoring_since')
+      .eq('mentor_team_id', team.id)
+      .eq('season_id', currentSeason.id)
+      .order('team_number')
+
+    if (teamsResp.data) {
+      const teams = teamsResp.data.map((t) => ({
+        id: t.id,
+        name: t.team_name,
+        number: t.team_number || undefined,
+        mentoring_since: t.mentoring_since || undefined
+      }))
+      setMentoredTeams(teams)
+      loadTeamStats(teams.map(t => t.id))
     }
+  }, [team?.id, currentSeason?.id, loadTeamStats])
 
-    const num = parseInt(newTeamNumber) || Math.floor(Math.random() * 9000) + 100
-    const teamName = newTeamName || `Team ${num}`
-    const mentoringSince = newTeamMentoringSince ? parseInt(newTeamMentoringSince) : null
+  const selectedTeam = React.useMemo(
+    () => mentoredTeams.find(t => t.id === selectedTeamId),
+    [mentoredTeams, selectedTeamId]
+  )
 
-    try {
-      if (editingTeamId) {
-        // Update existing team
-        const { error } = await supabase
-          .from('mentoring_teams')
-          .update({
-            team_number: num,
-            team_name: teamName,
-            mentoring_since: mentoringSince
-          })
-          .eq('id', editingTeamId)
-
-        if (error) {
-          console.error('Failed to update team', error)
-          alert(`Failed to update team: ${error.message}`)
-        } else {
-          setMentoredTeams((s) => s.map(t => t.id === editingTeamId ? {
-            ...t,
-            name: teamName,
-            number: num,
-            mentoring_since: mentoringSince || undefined
-          } : t))
-          alert('Team updated successfully!')
-        }
-      } else {
-        // Create new team
-        const { data, error } = await supabase
-          .from('mentoring_teams')
-          .insert([{
-            team_number: num,
-            team_name: teamName,
-            mentor_team_id: team!.id,
-            season_id: currentSeason!.id,
-            mentor_id: user.id,
-            mentoring_since: mentoringSince
-          }])
-          .select()
-          .single()
-
-        if (error) {
-          console.error('Failed to create team', error)
-          alert(`Failed to create team: ${error.message}`)
-        } else if (data) {
-          setMentoredTeams((s) => [...s, {
-            id: data.id,
-            name: data.team_name,
-            number: data.team_number,
-            mentoring_since: data.mentoring_since || undefined
-          }])
-        }
-      }
-
-      // Close dialog and reset form
-      setShowTeamDialog(false)
-      setEditingTeamId(null)
-      setNewTeamName('')
-      setNewTeamNumber('')
-      setNewTeamMentoringSince('')
-    } catch (err) {
-      console.error('Error saving team', err)
-      alert('Failed to save team')
-    }
-  }
-
-  const selectedTeam = mentoredTeams.find(t => t.id === selectedTeamId)
-
-  // Action buttons for the top navigation
-  const actionButtons = (
+  // Memoize action buttons to prevent DashboardLayout header re-renders
+  const actionButtons = React.useMemo(() => (
     <div className="flex items-center gap-2">
       <Button className="btn-accent" size="sm" onClick={() => openTeamDialog()}>
         <Plus className="w-4 h-4 mr-2" />
@@ -642,7 +580,7 @@ export default function MentoringPage() {
         </Button>
       )}
     </div>
-  )
+  ), [mentoredTeams, selectedTeamId, openTeamDialog])
 
   return (
     <DashboardLayout pageTitle="Mentoring" pageIcon={Users} actions={actionButtons}>
@@ -797,71 +735,18 @@ export default function MentoringPage() {
           </div>
         )}
 
-        {/* Add/Edit Team Sheet */}
-        <Sheet open={showTeamDialog} onOpenChange={(open) => {
-          setShowTeamDialog(open)
-          if (!open) {
-            setEditingTeamId(null)
-            setNewTeamName('')
-            setNewTeamNumber('')
-            setNewTeamMentoringSince('')
-          }
-        }}>
-          <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-6">
-            <SheetHeader className="p-0 mb-4">
-              <SheetTitle>{editingTeamId ? 'Edit Mentee Team' : 'Add Mentee Team'}</SheetTitle>
-              <SheetDescription>
-                {editingTeamId ? 'Update the details for this mentee team.' : 'Add a new team that your team is mentoring this season.'}
-              </SheetDescription>
-            </SheetHeader>
-
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="team-name">Team Name</Label>
-                <Input
-                  id="team-name"
-                  placeholder="Team name"
-                  value={newTeamName}
-                  onChange={(e) => setNewTeamName(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="team-number">Team Number</Label>
-                <Input
-                  id="team-number"
-                  type="number"
-                  placeholder="Team number"
-                  value={newTeamNumber}
-                  onChange={(e) => setNewTeamNumber(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Mentoring Since</Label>
-                <Select value={newTeamMentoringSince} onValueChange={setNewTeamMentoringSince}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select year..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {YEARS_ARRAY.map(year => (
-                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <SheetFooter className="mt-6">
-              <Button variant="outline" onClick={() => setShowTeamDialog(false)}>
-                Cancel
-              </Button>
-              <Button className="btn-accent" onClick={handleSaveTeam}>
-                {editingTeamId ? 'Save Changes' : 'Add Mentee Team'}
-              </Button>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
+        {/* Add/Edit Team Sheet - Isolated component to prevent parent re-renders */}
+        {team && currentSeason && user && (
+          <AddTeamSheet
+            open={showTeamDialog}
+            onOpenChange={setShowTeamDialog}
+            editingTeam={editingTeam}
+            teamId={team.id}
+            seasonId={currentSeason.id}
+            userId={user.id}
+            onSuccess={handleTeamSaved}
+          />
+        )}
 
         {/* Sessions Section */}
         {selectedTeamId && (
@@ -898,10 +783,10 @@ export default function MentoringPage() {
                         ? `${formatTime(session.start_time)} - ${formatTime(session.end_time)}`
                         : 'TBD'
 
-                      // Get attendee names
+                      // Get attendee names using O(1) map lookup instead of O(n) find
                       const attendeeNames = session.attendees
                         ?.map(attendeeId => {
-                          const member = teamMembers.find(m => m.id === attendeeId)
+                          const member = teamMembersMap.get(attendeeId)
                           return member ? `${member.first_name} ${member.last_name}` : null
                         })
                         .filter(Boolean)
@@ -944,8 +829,9 @@ export default function MentoringPage() {
           </Card>
         )}
 
-        {/* Add Session Sheet */}
-        <Sheet open={showAddSession} onOpenChange={(open) => {
+        {/* Add Session Sheet - Only render when open */}
+        {showAddSession && (
+          <Sheet open={showAddSession} onOpenChange={(open) => {
           setShowAddSession(open)
           // Set default team to currently selected team, or first team if none selected
           if (open && mentoredTeams.length > 0 && !sessionTeamId) {
@@ -1051,10 +937,7 @@ export default function MentoringPage() {
                 <label className="text-sm font-medium mb-2 block">Who Attended</label>
                 <div className="mb-2">
                   {(() => {
-                    // Split members by role
-                    const mentorsAndAdmins = teamMembers.filter(m => ["mentor", "admin"].includes(m.role.toLowerCase()))
-                    const students = teamMembers.filter(m => !["mentor", "admin"].includes(m.role.toLowerCase()))
-
+                    // Use pre-filtered members from useMemo
                     const handleToggleAttendee = (id: string) => {
                       setSelectedAttendees(prev =>
                         prev.includes(id) ? prev.filter(aid => aid !== id) : [...prev, id]
@@ -1132,6 +1015,7 @@ export default function MentoringPage() {
             </SheetFooter>
           </SheetContent>
         </Sheet>
+        )}
 
         {/* Edit Session Sheet */}
         {editingSession && (
@@ -1212,9 +1096,7 @@ export default function MentoringPage() {
                   <label className="text-sm font-medium mb-2 block">Attendees</label>
                   <div className="border rounded-md p-3 max-h-48 overflow-y-auto">
                     {(() => {
-                      const mentorsAndAdmins = teamMembers.filter(m => ["mentor", "admin"].includes(m.role.toLowerCase()))
-                      const students = teamMembers.filter(m => !["mentor", "admin"].includes(m.role.toLowerCase()))
-
+                      // Use pre-filtered members from useMemo
                       const handleToggleEditAttendee = (id: string) => {
                         setEditAttendees(prev =>
                           prev.includes(id) ? prev.filter(aid => aid !== id) : [...prev, id]
