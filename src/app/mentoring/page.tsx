@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -126,6 +126,18 @@ function calculateDuration(startTime: string | null, endTime: string | null): st
     return 'TBD'
   }
 }
+
+// Generate years array once, outside component
+const generateYearsArray = () => {
+  const currentYear = new Date().getFullYear()
+  const years = []
+  for (let year = currentYear; year >= currentYear - 20; year--) {
+    years.push(year)
+  }
+  return years
+}
+
+const YEARS_ARRAY = generateYearsArray()
 
 export default function MentoringPage() {
   const { user } = useAuth()
@@ -798,6 +810,9 @@ export default function MentoringPage() {
           <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-6">
             <SheetHeader className="p-0 mb-4">
               <SheetTitle>{editingTeamId ? 'Edit Mentee Team' : 'Add Mentee Team'}</SheetTitle>
+              <SheetDescription>
+                {editingTeamId ? 'Update the details for this mentee team.' : 'Add a new team that your team is mentoring this season.'}
+              </SheetDescription>
             </SheetHeader>
 
             <div className="grid gap-4">
@@ -829,16 +844,9 @@ export default function MentoringPage() {
                     <SelectValue placeholder="Select year..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {(() => {
-                      const currentYear = new Date().getFullYear()
-                      const years = []
-                      for (let year = currentYear; year >= currentYear - 20; year--) {
-                        years.push(year)
-                      }
-                      return years.map(year => (
-                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                      ))
-                    })()}
+                    {YEARS_ARRAY.map(year => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -951,6 +959,9 @@ export default function MentoringPage() {
           <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-6">
             <SheetHeader className="p-0 mb-4">
               <SheetTitle>Add Mentoring Session</SheetTitle>
+              <SheetDescription>
+                Record a mentoring session with one of your mentee teams.
+              </SheetDescription>
             </SheetHeader>
 
             <div className="grid gap-4">
@@ -1128,6 +1139,9 @@ export default function MentoringPage() {
             <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto p-6">
               <SheetHeader className="p-0 mb-4">
                 <SheetTitle>Edit Session</SheetTitle>
+                <SheetDescription>
+                  Update the details for this mentoring session.
+                </SheetDescription>
               </SheetHeader>
 
               <div className="grid gap-4">
