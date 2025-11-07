@@ -371,6 +371,7 @@ export function EventFormContent({ eventId, mode, onSuccess }: EventFormContentP
                       <SelectItem value="fundraising">Fundraising</SelectItem>
                       <SelectItem value="training">Training</SelectItem>
                       <SelectItem value="scrimmage">Scrimmage</SelectItem>
+                      <SelectItem value="social">Social</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>

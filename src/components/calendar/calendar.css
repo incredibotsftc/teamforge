@@ -107,6 +107,18 @@
   overflow: hidden;
 }
 
+/* Event type badges in agenda view - desktop */
+.rbc-agenda-view .rbc-agenda-event-cell {
+  padding: 12px 16px !important;
+}
+
+/* Allow proper wrapping on mobile */
+@media (max-width: 768px) {
+  .rbc-agenda-view .rbc-agenda-event-cell {
+    padding: 8px 4px !important;
+  }
+}
+
 .rbc-agenda-view table {
   background: hsl(var(--background));
   width: 100%;

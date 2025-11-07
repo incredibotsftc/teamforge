@@ -367,6 +367,56 @@ export const BigCalendarView = forwardRef<BigCalendarViewHandle, BigCalendarView
     )
   }
 
+  // Custom Agenda Date component - shows date for every event
+  const AgendaDate = ({ day }: { day: Date }) => {
+    return (
+      <div className="text-sm font-semibold">
+        {moment(day).format('ddd MMM DD')}
+      </div>
+    )
+  }
+
+  // Custom Agenda Event component to show event type
+  const AgendaEvent = ({ event }: { event: BigCalendarEventType }) => {
+    const getEventTypeColor = (type: string) => {
+      switch (type) {
+        case 'meeting': return '#3b82f6'      // blue
+        case 'review': return '#8b5cf6'       // purple
+        case 'workshop': return '#10b981'     // green
+        case 'competition': return '#ef4444'  // red
+        case 'practice': return '#f59e0b'     // orange
+        case 'outreach': return '#14b8a6'     // teal
+        case 'fundraising': return '#ec4899'  // pink
+        case 'training': return '#6366f1'     // indigo
+        case 'scrimmage': return '#eab308'    // yellow
+        case 'social': return '#06b6d4'       // cyan
+        case 'other': return '#6b7280'        // gray
+        default: return '#3174ad'             // default blue
+      }
+    }
+
+    const getEventTypeLabel = (type: string) => {
+      return type.charAt(0).toUpperCase() + type.slice(1)
+    }
+
+    return (
+      <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+        <span
+          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium text-white whitespace-nowrap w-fit"
+          style={{ backgroundColor: getEventTypeColor(event.eventType) }}
+        >
+          {getEventTypeLabel(event.eventType)}
+        </span>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 flex-1 min-w-0">
+          <span className="font-medium text-sm sm:text-base truncate">{event.title}</span>
+          {event.location && (
+            <span className="text-xs sm:text-sm text-muted-foreground truncate">📍 {event.location}</span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   // Custom toolbar for better styling
   const CustomToolbar = ({ label, onNavigate }: ToolbarProps<BigCalendarEventType, object>) => {
     return (
@@ -471,47 +521,175 @@ export const BigCalendarView = forwardRef<BigCalendarViewHandle, BigCalendarView
   }
 
 
+  // Custom Agenda View Component
+  const CustomAgendaView = () => {
+    const getEventTypeColor = (type: string) => {
+      switch (type) {
+        case 'meeting': return '#3b82f6'
+        case 'review': return '#8b5cf6'
+        case 'workshop': return '#10b981'
+        case 'competition': return '#ef4444'
+        case 'practice': return '#f59e0b'
+        case 'outreach': return '#14b8a6'
+        case 'fundraising': return '#ec4899'
+        case 'training': return '#6366f1'
+        case 'scrimmage': return '#eab308'
+        case 'social': return '#06b6d4'
+        case 'other': return '#6b7280'
+        default: return '#3174ad'
+      }
+    }
+
+    const getEventTypeLabel = (type: string) => {
+      return type.charAt(0).toUpperCase() + type.slice(1)
+    }
+
+    // Get events for the next 30 days from current date
+    const agendaStart = moment(date).startOf('day')
+    const agendaEnd = moment(date).add(30, 'days').endOf('day')
+
+    const agendaEvents = calendarEvents
+      .filter(event => {
+        const eventDate = moment(event.start)
+        return eventDate.isSameOrAfter(agendaStart) && eventDate.isSameOrBefore(agendaEnd)
+      })
+      .sort((a, b) => {
+        const aTime = a.start?.getTime() ?? 0
+        const bTime = b.start?.getTime() ?? 0
+        return aTime - bTime
+      })
+
+    return (
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-muted border-b border-border">
+                <th className="text-left py-3 px-4 font-semibold text-sm text-muted-foreground">Date</th>
+                <th className="text-left py-3 px-4 font-semibold text-sm text-muted-foreground">Time</th>
+                <th className="text-left py-3 px-4 font-semibold text-sm text-muted-foreground">Event</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agendaEvents.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="text-center py-8 text-muted-foreground">
+                    No events in the next 30 days
+                  </td>
+                </tr>
+              ) : (
+                agendaEvents.map((event) => (
+                  <tr
+                    key={event.id}
+                    className="border-b border-border hover:bg-muted/30 cursor-pointer transition-colors"
+                    onClick={() => onEventClick && onEventClick(event.id)}
+                  >
+                    <td className="py-3 px-4 text-sm font-semibold whitespace-nowrap">
+                      {moment(event.start).format('ddd MMM DD')}
+                    </td>
+                    <td className="py-3 px-4 text-sm whitespace-nowrap">
+                      {event.allDay ? (
+                        <span className="text-muted-foreground">All day</span>
+                      ) : (
+                        <span>
+                          {moment(event.start).format('h:mm A')} - {moment(event.end).format('h:mm A')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium text-white whitespace-nowrap w-fit"
+                          style={{ backgroundColor: getEventTypeColor(event.eventType) }}
+                        >
+                          {getEventTypeLabel(event.eventType)}
+                        </span>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 flex-1 min-w-0">
+                          <span className="font-medium text-sm sm:text-base">{event.title}</span>
+                          {event.location && (
+                            <span className="text-xs sm:text-sm text-muted-foreground">📍 {event.location}</span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div ref={calendarRef} className={view === 'agenda' ? 'w-full h-auto min-h-[600px]' : 'h-[calc(100vh-220px)] sm:h-[calc(100vh-180px)] min-h-[400px]'}>
-      <Calendar
-        localizer={localizer}
-        events={calendarEvents}
-        startAccessor="start"
-        endAccessor="end"
-        style={{ height: '100%' }}
-        view={view}
-        onView={handleViewChange}
-        date={date}
-        onNavigate={setDate}
-        eventPropGetter={eventStyleGetter}
-        components={{
-          event: EventComponent,
-          toolbar: CustomToolbar
-        }}
-        formats={{
-          timeGutterFormat: 'h A',
-          eventTimeRangeFormat: ({ start, end }) => 
-            `${moment(start).format('h:mm A')} - ${moment(end).format('h:mm A')}`,
-          agendaTimeRangeFormat: ({ start, end }) => 
-            `${moment(start).format('h:mm A')} - ${moment(end).format('h:mm A')}`,
-        }}
-        step={30}
-        timeslots={2}
-        defaultView="month"
-        views={['month', 'week', 'day', 'agenda']}
-        popup={true}
-        showMultiDayTimes={true}
-        onSelectEvent={(event) => {
-          // Call parent component's event click handler
-          if (onEventClick) {
-            onEventClick(event.id)
-          }
-        }}
-        onSelectSlot={() => {
-          // Don't do anything on empty slot click for now
-          // Parent component handles event creation via the Add Event button
-        }}
-      />
+      {view === 'agenda' ? (
+        <>
+          <CustomToolbar
+            label={`${moment(date).format('MMMM YYYY')} - Next 30 Days`}
+            onNavigate={(action) => {
+              if (action === 'PREV') {
+                setDate(moment(date).subtract(1, 'month').toDate())
+              } else if (action === 'NEXT') {
+                setDate(moment(date).add(1, 'month').toDate())
+              } else {
+                setDate(new Date())
+              }
+            }}
+            date={date}
+            localizer={localizer}
+            view={view}
+            views={['month', 'week', 'day', 'agenda']}
+            onView={handleViewChange}
+          />
+          <CustomAgendaView />
+        </>
+      ) : (
+        <Calendar
+          localizer={localizer}
+          events={calendarEvents}
+          startAccessor="start"
+          endAccessor="end"
+          style={{ height: '100%' }}
+          view={view}
+          onView={handleViewChange}
+          date={date}
+          onNavigate={setDate}
+          eventPropGetter={eventStyleGetter}
+          components={{
+            event: EventComponent,
+            toolbar: CustomToolbar,
+            agenda: {
+              event: AgendaEvent,
+              date: AgendaDate
+            }
+          }}
+          formats={{
+            timeGutterFormat: 'h A',
+            eventTimeRangeFormat: ({ start, end }) =>
+              `${moment(start).format('h:mm A')} - ${moment(end).format('h:mm A')}`,
+            agendaTimeRangeFormat: ({ start, end }) =>
+              `${moment(start).format('h:mm A')} - ${moment(end).format('h:mm A')}`,
+          }}
+          step={30}
+          timeslots={2}
+          defaultView="month"
+          views={['month', 'week', 'day', 'agenda']}
+          popup={true}
+          showMultiDayTimes={true}
+          onSelectEvent={(event) => {
+            // Call parent component's event click handler
+            if (onEventClick) {
+              onEventClick(event.id)
+            }
+          }}
+          onSelectSlot={() => {
+            // Don't do anything on empty slot click for now
+            // Parent component handles event creation via the Add Event button
+          }}
+        />
+      )}
     </div>
   )
 })
