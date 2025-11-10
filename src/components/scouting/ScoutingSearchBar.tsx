@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Loader2, Search, SlidersHorizontal } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 interface TeamInfo {
   teamNumber: number
@@ -51,6 +52,7 @@ export function ScoutingSearchBar({
   onApiCredentialsError
 }: ScoutingSearchBarProps) {
   const router = useRouter()
+  const pathname = usePathname()
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -59,6 +61,16 @@ export function ScoutingSearchBar({
   const [showSelectionDialog, setShowSelectionDialog] = useState(false)
   const [searchMatches, setSearchMatches] = useState<(FTCEventAPIResponse | TeamInfo)[]>([])
   const [selectionType, setSelectionType] = useState<'team' | 'event'>('event')
+  const [showCacheLoadingDialog, setShowCacheLoadingDialog] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
+
+  // Close dialog when route changes (navigation complete)
+  useEffect(() => {
+    if (isNavigating) {
+      setShowCacheLoadingDialog(false)
+      setIsNavigating(false)
+    }
+  }, [pathname, isNavigating])
 
   // Handle search
   const handleSearch = async () => {
@@ -80,7 +92,31 @@ export function ScoutingSearchBar({
         }
       }
 
-      const response = await fetch(`/api/scouting/search?query=${encodeURIComponent(searchQuery.trim())}&type=${searchType}&season=${selectedSeason}`)
+      // Get session for authentication
+      const { data: { session } } = await supabase.auth.getSession()
+
+      // For team searches, check if cache exists first
+      if (searchType === 'team') {
+        const { count } = await supabase
+          .from('ftc_teams_cache')
+          .select('*', { count: 'exact', head: true })
+          .eq('season', selectedSeason)
+
+        // If cache is empty, show loading dialog immediately
+        if (count === 0) {
+          setShowCacheLoadingDialog(true)
+        }
+      }
+
+      // Prepare headers with authentication if available
+      const headers: HeadersInit = {}
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+
+      const response = await fetch(`/api/scouting/search?query=${encodeURIComponent(searchQuery.trim())}&type=${searchType}&season=${selectedSeason}`, {
+        headers
+      })
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -89,19 +125,23 @@ export function ScoutingSearchBar({
         if (response.status === 401 && errorData.error === 'API_CREDENTIALS_MISSING') {
           onApiCredentialsError?.()
           setSearchLoading(false)
+          setShowCacheLoadingDialog(false)
           return
         }
 
+        setShowCacheLoadingDialog(false)
         throw new Error(errorData.error || 'Search failed')
       }
 
       const data = await response.json()
 
       if (!data.success) {
+        setShowCacheLoadingDialog(false)
         throw new Error('Search failed')
       }
 
       if (data.matches.length === 0) {
+        setShowCacheLoadingDialog(false)
         const errorMsg = `No ${searchType === 'team' ? 'teams' : 'events'} found matching "${searchQuery}"`
         onError?.(errorMsg)
         setSearchLoading(false)
@@ -110,6 +150,8 @@ export function ScoutingSearchBar({
 
       if (data.matches.length === 1 || data.exactMatch) {
         // Auto-navigate for single match
+        // Set navigating flag - dialog will close when pathname changes
+        setIsNavigating(true)
         if (searchType === 'team') {
           const teamInfo = data.matches[0] as TeamInfo
           const params = new URLSearchParams()
@@ -125,12 +167,14 @@ export function ScoutingSearchBar({
         setSearchLoading(false)
       } else {
         // Show selection dialog for multiple matches
+        setShowCacheLoadingDialog(false)
         setSearchMatches(data.matches)
         setSelectionType(searchType)
         setShowSelectionDialog(true)
         setSearchLoading(false)
       }
     } catch (err) {
+      setShowCacheLoadingDialog(false)
       const errorMsg = err instanceof Error ? err.message : 'Search failed'
       onError?.(errorMsg)
       setSearchLoading(false)
@@ -352,6 +396,25 @@ export function ScoutingSearchBar({
               }
             })}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cache Loading Info Dialog */}
+      <Dialog open={showCacheLoadingDialog}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+              This might take a few seconds...
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-2">
+                <div>
+                  Building team cache for faster searches. Subsequent searches will be instant! ⚡
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
         </DialogContent>
       </Dialog>
     </>

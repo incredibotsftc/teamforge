@@ -134,12 +134,22 @@ export async function GET(request: NextRequest) {
                   last_updated: new Date().toISOString()
                 }))
 
-                await authClient
-                  .from('ftc_teams_cache')
-                  .upsert(teamsToCache, {
-                    onConflict: 'team_number,season',
-                    ignoreDuplicates: false
-                  })
+                // Batch upsert in chunks of 500
+                const batchSize = 500
+                for (let i = 0; i < teamsToCache.length; i += batchSize) {
+                  const batch = teamsToCache.slice(i, i + batchSize)
+
+                  const { error } = await authClient
+                    .from('ftc_teams_cache')
+                    .upsert(batch, {
+                      onConflict: 'team_number,season',
+                      ignoreDuplicates: false
+                    })
+
+                  if (error) {
+                    console.error(`[/api/scouting/search] Cache update error in batch ${Math.floor(i / batchSize) + 1}:`, error)
+                  }
+                }
               } catch (err) {
                 console.error('[/api/scouting/search] Cache update error:', err)
               }
@@ -231,12 +241,22 @@ export async function GET(request: NextRequest) {
                 last_updated: new Date().toISOString()
               }))
 
-              await authClient
-                .from('ftc_teams_cache')
-                .upsert(teamsToCache, {
-                  onConflict: 'team_number,season',
-                  ignoreDuplicates: false
-                })
+              // Batch upsert in chunks of 500
+              const batchSize = 500
+              for (let i = 0; i < teamsToCache.length; i += batchSize) {
+                const batch = teamsToCache.slice(i, i + batchSize)
+
+                const { error } = await authClient
+                  .from('ftc_teams_cache')
+                  .upsert(batch, {
+                    onConflict: 'team_number,season',
+                    ignoreDuplicates: false
+                  })
+
+                if (error) {
+                  console.error(`[/api/scouting/search] Cache update error in batch ${Math.floor(i / batchSize) + 1}:`, error)
+                }
+              }
             } catch (err) {
               console.error('[/api/scouting/search] Cache update error:', err)
             }
