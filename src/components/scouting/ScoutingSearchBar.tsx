@@ -95,19 +95,6 @@ export function ScoutingSearchBar({
       // Get session for authentication
       const { data: { session } } = await supabase.auth.getSession()
 
-      // For team searches, check if cache exists first
-      if (searchType === 'team') {
-        const { count } = await supabase
-          .from('ftc_teams_cache')
-          .select('*', { count: 'exact', head: true })
-          .eq('season', selectedSeason)
-
-        // If cache is empty, show loading dialog immediately
-        if (count === 0) {
-          setShowCacheLoadingDialog(true)
-        }
-      }
-
       // Prepare headers with authentication if available
       const headers: HeadersInit = {}
       if (session?.access_token) {

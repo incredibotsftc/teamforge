@@ -109,47 +109,34 @@ export async function GET(request: NextRequest) {
             })
           }
 
-          // Cache miss - fetch from FTC API
-          const allTeams = await ftcEventsService.getAllTeams(parseInt(season))
-          const matchingTeam = allTeams.find(team => team.teamNumber === teamNumber)
+          // Cache miss - fetch only this team from FTC API
+          const matchingTeam = await ftcEventsService.getTeam(parseInt(season), teamNumber)
 
-          // Cache ALL teams in background (fire and forget) if user is authenticated
-          if (authClient) {
+          // Cache only this team (quick operation) if user is authenticated
+          if (authClient && matchingTeam) {
             void (async () => {
               try {
-                const teamsToCache = allTeams.map(team => ({
-                  team_number: team.teamNumber,
-                  season: parseInt(season),
-                  name_full: team.nameFull || team.nameShort || `Team ${team.teamNumber}`,
-                  name_short: team.nameShort,
-                  school_name: team.schoolName,
-                  city: team.city,
-                  state_prov: team.stateProv,
-                  country: team.country,
-                  rookie_year: team.rookieYear,
-                  website: team.website,
-                  robot_name: team.robotName,
-                  district_code: team.districtCode,
-                  home_cmp: team.homeCMP,
-                  last_updated: new Date().toISOString()
-                }))
-
-                // Batch upsert in chunks of 500
-                const batchSize = 500
-                for (let i = 0; i < teamsToCache.length; i += batchSize) {
-                  const batch = teamsToCache.slice(i, i + batchSize)
-
-                  const { error } = await authClient
-                    .from('ftc_teams_cache')
-                    .upsert(batch, {
-                      onConflict: 'team_number,season',
-                      ignoreDuplicates: false
-                    })
-
-                  if (error) {
-                    console.error(`[/api/scouting/search] Cache update error in batch ${Math.floor(i / batchSize) + 1}:`, error)
-                  }
-                }
+                await authClient
+                  .from('ftc_teams_cache')
+                  .upsert({
+                    team_number: matchingTeam.teamNumber,
+                    season: parseInt(season),
+                    name_full: matchingTeam.nameFull || matchingTeam.nameShort || `Team ${matchingTeam.teamNumber}`,
+                    name_short: matchingTeam.nameShort,
+                    school_name: matchingTeam.schoolName,
+                    city: matchingTeam.city,
+                    state_prov: matchingTeam.stateProv,
+                    country: matchingTeam.country,
+                    rookie_year: matchingTeam.rookieYear,
+                    website: matchingTeam.website,
+                    robot_name: matchingTeam.robotName,
+                    district_code: matchingTeam.districtCode,
+                    home_cmp: matchingTeam.homeCMP,
+                    last_updated: new Date().toISOString()
+                  }, {
+                    onConflict: 'team_number,season',
+                    ignoreDuplicates: false
+                  })
               } catch (err) {
                 console.error('[/api/scouting/search] Cache update error:', err)
               }
@@ -208,67 +195,13 @@ export async function GET(request: NextRequest) {
           })
         }
 
-        // Cache miss - fetch ALL teams from FTC API and filter locally
-        const allTeams = await ftcEventsService.getAllTeams(parseInt(season))
-
-        // Filter teams locally by name
-        const teams = allTeams.filter(team => {
-          const nameFullMatch = team.nameFull?.toLowerCase().includes(searchTerm)
-          const nameShortMatch = team.nameShort?.toLowerCase().includes(searchTerm)
-          const schoolMatch = team.schoolName?.toLowerCase().includes(searchTerm)
-          const robotNameMatch = team.robotName?.toLowerCase().includes(searchTerm)
-          return nameFullMatch || nameShortMatch || schoolMatch || robotNameMatch
-        }).slice(0, 10) // Limit to 10 results
-
-        // Cache ALL teams in background (fire and forget) if user is authenticated
-        if (authClient) {
-          void (async () => {
-            try {
-              const teamsToCache = allTeams.map(team => ({
-                team_number: team.teamNumber,
-                season: parseInt(season),
-                name_full: team.nameFull || team.nameShort || `Team ${team.teamNumber}`,
-                name_short: team.nameShort,
-                school_name: team.schoolName,
-                city: team.city,
-                state_prov: team.stateProv,
-                country: team.country,
-                rookie_year: team.rookieYear,
-                website: team.website,
-                robot_name: team.robotName,
-                district_code: team.districtCode,
-                home_cmp: team.homeCMP,
-                last_updated: new Date().toISOString()
-              }))
-
-              // Batch upsert in chunks of 500
-              const batchSize = 500
-              for (let i = 0; i < teamsToCache.length; i += batchSize) {
-                const batch = teamsToCache.slice(i, i + batchSize)
-
-                const { error } = await authClient
-                  .from('ftc_teams_cache')
-                  .upsert(batch, {
-                    onConflict: 'team_number,season',
-                    ignoreDuplicates: false
-                  })
-
-                if (error) {
-                  console.error(`[/api/scouting/search] Cache update error in batch ${Math.floor(i / batchSize) + 1}:`, error)
-                }
-              }
-            } catch (err) {
-              console.error('[/api/scouting/search] Cache update error:', err)
-            }
-          })()
-        }
-
+        // Cache miss - for name searches, tell user to use team number or populate cache
         return NextResponse.json({
           success: true,
           type: 'team',
-          matches: teams,
-          exactMatch: teams.length === 1,
-          fromCache: false
+          matches: [],
+          exactMatch: false,
+          message: 'Team name search requires cache to be populated. Please search by team number or contact your administrator to populate the cache.'
         })
       } catch (error) {
         console.error('Error searching teams:', error)
