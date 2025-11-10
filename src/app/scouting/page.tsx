@@ -62,6 +62,25 @@ function ScoutingPageContent() {
 
   // Fetch user's team events
   const fetchTeamEvents = useCallback(async (teamNumber: number) => {
+    const cacheKey = `team_events_${teamNumber}_${selectedSeason}`
+
+    // Check sessionStorage cache first
+    try {
+      const cachedData = sessionStorage.getItem(cacheKey)
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData)
+        const cacheAge = Date.now() - parsed.timestamp
+        // Use cache if less than 5 minutes old
+        if (cacheAge < 5 * 60 * 1000) {
+          setEvents(parsed.data)
+          setLoading(false)
+          return
+        }
+      }
+    } catch (err) {
+      console.error('Cache read error:', err)
+    }
+
     setLoading(true)
     setError(null)
     setApiCredentialsError(false)
@@ -105,6 +124,16 @@ function ScoutingPageContent() {
         )
 
         setEvents(sortedEvents)
+
+        // Cache the results
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            data: sortedEvents,
+            timestamp: Date.now()
+          }))
+        } catch (err) {
+          console.error('Cache write error:', err)
+        }
       } else {
         setEvents([])
       }

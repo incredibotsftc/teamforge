@@ -195,13 +195,14 @@ export async function GET(request: NextRequest) {
           })
         }
 
-        // Cache miss - for name searches, tell user to use team number or populate cache
+        // Cache miss - return empty with flag to trigger cache population
         return NextResponse.json({
           success: true,
           type: 'team',
           matches: [],
           exactMatch: false,
-          message: 'Team name search requires cache to be populated. Please search by team number or contact your administrator to populate the cache.'
+          cacheEmpty: true,
+          message: 'Cache is being populated. This will take a few moments. Please try your search again shortly.'
         })
       } catch (error) {
         console.error('Error searching teams:', error)

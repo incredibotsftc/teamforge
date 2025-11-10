@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 
@@ -161,8 +161,17 @@ export function AppDataProvider({ children }: AppDataProviderProps) {
     }
   }
 
+  // Track previous user ID to avoid refetching on token refresh
+  const prevUserIdRef = React.useRef<string | null>(null)
+
   useEffect(() => {
-    fetchAppData()
+    const currentUserId = user?.id ?? null
+
+    // Only fetch if user ID actually changed (not just token refresh)
+    if (prevUserIdRef.current !== currentUserId) {
+      prevUserIdRef.current = currentUserId
+      fetchAppData()
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 

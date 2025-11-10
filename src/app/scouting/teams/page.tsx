@@ -72,8 +72,24 @@ function ScoutingTeamsPageContent() {
     return teamNumbersParam ? teamNumbersParam.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n)) : []
   }, [teamNumbersParam])
 
-  // State
-  const [loading, setLoading] = useState(true)
+  // Check cache immediately to set initial loading state
+  const initialLoadKey = `${teamNumbersParam}-${selectedSeason}`
+  const hasInitialCache = React.useMemo(() => {
+    try {
+      const cachedData = sessionStorage.getItem(`teams_data_${initialLoadKey}`)
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData)
+        const cacheAge = Date.now() - parsed.timestamp
+        return cacheAge < 5 * 60 * 1000
+      }
+    } catch {
+      // Ignore errors
+    }
+    return false
+  }, [initialLoadKey])
+
+  // State - start with loading=false if we have cache
+  const [loading, setLoading] = useState(!hasInitialCache)
   const [error, setError] = useState<string | null>(null)
   const [teamsData, setTeamsData] = useState<Array<{
     teamNumber: number
@@ -216,6 +232,30 @@ function ScoutingTeamsPageContent() {
       return
     }
 
+    // Check sessionStorage for cached data
+    let usedCache = false
+    try {
+      const cachedData = sessionStorage.getItem(`teams_data_${loadKey}`)
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData)
+        const cacheAge = Date.now() - parsed.timestamp
+        // Use cache if less than 5 minutes old
+        if (cacheAge < 5 * 60 * 1000) {
+          setTeamsData(parsed.data)
+          setLoading(false)
+          currentLoadKeyRef.current = loadKey
+          usedCache = true
+        }
+      }
+    } catch (err) {
+      console.error('Cache read error:', err)
+    }
+
+    // If we used cache, don't fetch
+    if (usedCache) {
+      return
+    }
+
     // Mark this load key as being processed
     currentLoadKeyRef.current = loadKey
 
@@ -239,6 +279,16 @@ function ScoutingTeamsPageContent() {
           clearTimeout(safetyTimeout)
           setTeamsData(results)
           setLoading(false)
+
+          // Cache the results in sessionStorage
+          try {
+            sessionStorage.setItem(`teams_data_${loadKey}`, JSON.stringify({
+              data: results,
+              timestamp: Date.now()
+            }))
+          } catch (err) {
+            console.error('Cache write error:', err)
+          }
         }
       } catch {
         if (currentLoadKeyRef.current === loadKey) {

@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Loader2, Search, SlidersHorizontal } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useCachePopulation } from '@/hooks/useCachePopulation'
 
 interface TeamInfo {
   teamNumber: number
@@ -53,6 +54,7 @@ export function ScoutingSearchBar({
 }: ScoutingSearchBarProps) {
   const router = useRouter()
   const pathname = usePathname()
+  const { isPopulating, progress, populateCache, checkCacheStatus } = useCachePopulation()
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -71,6 +73,17 @@ export function ScoutingSearchBar({
       setIsNavigating(false)
     }
   }, [pathname, isNavigating])
+
+  // Handle cache population completion
+  useEffect(() => {
+    if (!isPopulating && showCacheLoadingDialog && progress.current > 0) {
+      setShowCacheLoadingDialog(false)
+      // Show success message
+      setTimeout(() => {
+        onError?.(`Cache populated with ${progress.cached} teams! You can now search by name.`)
+      }, 500)
+    }
+  }, [isPopulating, showCacheLoadingDialog, progress, onError])
 
   // Handle search
   const handleSearch = async () => {
@@ -128,6 +141,27 @@ export function ScoutingSearchBar({
       }
 
       if (data.matches.length === 0) {
+        // Check if cache is empty and trigger population for team name searches
+        if (data.cacheEmpty && searchType === 'team') {
+          // First check if cache is already sufficiently populated
+          const isCachePopulated = await checkCacheStatus(selectedSeason)
+
+          if (isCachePopulated) {
+            // Cache is populated, this is genuinely a "no results" case
+            setShowCacheLoadingDialog(false)
+            const errorMsg = `No teams found matching "${searchQuery}"`
+            onError?.(errorMsg)
+            setSearchLoading(false)
+            return
+          }
+
+          // Cache is empty/incomplete, trigger population
+          setShowCacheLoadingDialog(true)
+          setSearchLoading(false)
+          populateCache(selectedSeason)
+          return
+        }
+
         setShowCacheLoadingDialog(false)
         const errorMsg = `No ${searchType === 'team' ? 'teams' : 'events'} found matching "${searchQuery}"`
         onError?.(errorMsg)
@@ -387,18 +421,34 @@ export function ScoutingSearchBar({
       </Dialog>
 
       {/* Cache Loading Info Dialog */}
-      <Dialog open={showCacheLoadingDialog}>
+      <Dialog open={showCacheLoadingDialog || isPopulating}>
         <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-              This might take a few seconds...
+              Building team cache...
             </DialogTitle>
             <DialogDescription asChild>
-              <div className="space-y-2 pt-2">
+              <div className="space-y-3 pt-2">
                 <div>
-                  Building team cache for faster searches. Subsequent searches will be instant! ⚡
+                  Loading teams from FTC API. This will take a moment but only needs to happen once per season.
                 </div>
+                {isPopulating && progress.total > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-foreground">
+                      {progress.cached} teams cached
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Page {progress.current} of {progress.total}
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-2">
+                      <div
+                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </DialogDescription>
           </DialogHeader>

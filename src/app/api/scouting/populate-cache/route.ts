@@ -1,24 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { ftcEventsService } from '@/lib/ftcEventsService'
-import { rateLimit, RateLimitPresets } from '@/lib/rateLimit'
 
 export async function POST(request: NextRequest) {
-  // Apply rate limiting
-  const rateLimitResult = await rateLimit(request, RateLimitPresets.STRICT)
-
-  if (!rateLimitResult.success) {
-    return NextResponse.json(
-      { error: 'Too many cache population requests. Please try again later.' },
-      {
-        status: 429,
-        headers: rateLimitResult.headers
-      }
-    )
-  }
+  // Note: No rate limiting for cache population since:
+  // 1. It requires authentication
+  // 2. It's a legitimate admin operation
+  // 3. It needs to make many sequential requests to complete
 
   try {
-    const { season } = await request.json()
+    const { season, page = 1 } = await request.json()
 
     if (!season) {
       return NextResponse.json(
@@ -49,14 +39,59 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    // Fetch all teams from FTC API
-    const allTeams = await ftcEventsService.getAllTeams(season)
+    // Fetch a single page of teams from FTC API (fast!)
+    const FTC_API_BASE_URL = 'https://ftc-api.firstinspires.org/v2.0'
+    const username = process.env.FTC_API_USERNAME
+    const apiKey = process.env.FTC_API_KEY
+
+    if (!username || !apiKey) {
+      return NextResponse.json(
+        { error: 'FTC API credentials not configured' },
+        { status: 500 }
+      )
+    }
+
+    const credentials = Buffer.from(`${username.trim()}:${apiKey.trim()}`).toString('base64')
+
+    // Request maximum page size (500 teams per page to reduce total pages)
+    const response = await fetch(`${FTC_API_BASE_URL}/${season}/teams?page=${page}&pageSize=500`, {
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`FTC API request failed: ${response.status}`)
+    }
+
+    interface FTCTeamResponse {
+      teamNumber: number
+      nameFull?: string
+      nameShort?: string
+      schoolName?: string
+      city?: string
+      stateProv?: string
+      country?: string
+      rookieYear?: number
+      website?: string
+      robotName?: string
+      districtCode?: string
+      homeCMP?: string
+    }
+
+    const data = await response.json()
+    const teams = data.teams || []
+    const pageTotal = data.pageTotal || 1
+    const pageCurrent = data.pageCurrent || page
+
+    // Log what the API is actually returning
+    console.log(`[populate-cache] FTC API returned: ${teams.length} teams, page ${pageCurrent}/${pageTotal}`)
 
     // Prepare teams for upsert
-    const teamsToCache = allTeams.map(team => ({
+    const teamsToCache = teams.map((team: FTCTeamResponse) => ({
       team_number: team.teamNumber,
       season: season,
-      // Use nameShort as fallback if nameFull is null/empty
       name_full: team.nameFull || team.nameShort || `Team ${team.teamNumber}`,
       name_short: team.nameShort,
       school_name: team.schoolName,
@@ -71,30 +106,23 @@ export async function POST(request: NextRequest) {
       last_updated: new Date().toISOString()
     }))
 
-    // Upsert teams in batches of 500
-    const batchSize = 500
-    let successCount = 0
-    let errorCount = 0
+    // Upsert this page's teams
+    const { error } = await supabase
+      .from('ftc_teams_cache')
+      .upsert(teamsToCache, {
+        onConflict: 'team_number,season',
+        ignoreDuplicates: false
+      })
 
-    for (let i = 0; i < teamsToCache.length; i += batchSize) {
-      const batch = teamsToCache.slice(i, i + batchSize)
-
-      const { error } = await supabase
-        .from('ftc_teams_cache')
-        .upsert(batch, {
-          onConflict: 'team_number,season',
-          ignoreDuplicates: false
-        })
-
-      if (error) {
-        console.error(`Error in batch ${Math.floor(i / batchSize) + 1}:`, error)
-        errorCount++
-      } else {
-        successCount++
-      }
+    if (error) {
+      console.error(`Error caching page ${page}:`, error)
+      return NextResponse.json(
+        { error: 'Failed to cache teams', details: error.message },
+        { status: 500 }
+      )
     }
 
-    // Verify cache
+    // Get total cached count
     const { count } = await supabase
       .from('ftc_teams_cache')
       .select('*', { count: 'exact', head: true })
@@ -102,13 +130,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Cache population completed for season ${season}`,
-      stats: {
-        totalTeams: allTeams.length,
-        successfulBatches: successCount,
-        failedBatches: errorCount,
-        cachedTeams: count
-      }
+      page: pageCurrent,
+      pageTotal: pageTotal,
+      teamsInPage: teams.length,
+      totalCached: count,
+      hasMore: pageCurrent < pageTotal,
+      message: `Cached page ${pageCurrent} of ${pageTotal} (${teams.length} teams)`
     })
 
   } catch (error) {
