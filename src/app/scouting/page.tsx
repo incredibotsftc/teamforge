@@ -8,7 +8,7 @@ import { useAppData } from '@/components/AppDataProvider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ClipboardList, Calendar, MapPin, Trophy, Loader2, AlertCircle } from 'lucide-react'
+import { ClipboardList, Calendar, MapPin, Trophy, Loader2, AlertCircle, FileText } from 'lucide-react'
 import { ScoutingSearchBar } from '@/components/scouting/ScoutingSearchBar'
 import { ApiSetupInstructions } from '@/components/scouting/ApiSetupInstructions'
 
@@ -197,15 +197,27 @@ function ScoutingPageContent() {
     router.push(`/scouting/events/${eventCode}?${params.toString()}`)
   }
 
-  // Search bar in header actions
+  // Search bar + scouting sheet button in header actions
   const actions = (
-    <ScoutingSearchBar
-      selectedSeason={selectedSeason}
-      availableSeasons={availableSeasons}
-      onSeasonChange={handleSeasonChange}
-      onError={(error) => setError(error)}
-      onApiCredentialsError={() => setApiCredentialsError(true)}
-    />
+    <div className="flex items-center gap-2">
+      <ScoutingSearchBar
+        selectedSeason={selectedSeason}
+        availableSeasons={availableSeasons}
+        onSeasonChange={handleSeasonChange}
+        onError={(error) => setError(error)}
+        onApiCredentialsError={() => setApiCredentialsError(true)}
+      />
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => router.push('/scouting/sheet')}
+        className="whitespace-nowrap"
+      >
+        <FileText className="mr-2 h-4 w-4" />
+        Scouting Sheet
+      </Button>
+    </div>
   )
 
   return (

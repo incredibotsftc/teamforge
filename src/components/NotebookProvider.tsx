@@ -28,6 +28,9 @@ interface NotebookContextType {
   setCurrentPage: (page?: NotebookPage) => void
   setCurrentFolder: (folder?: NotebookFolder) => void
   refreshData: () => Promise<void>
+  // Entity linking helpers
+  getPageByEntity: (entityType: import('@/types/notebook').LinkedEntityType, entityId: string) => Promise<NotebookPage | null>
+  getOrCreatePageForEntity: (entityType: import('@/types/notebook').LinkedEntityType, entityId: string, entityTitle: string) => Promise<NotebookPage | null>
 }
 
 const NotebookContext = createContext<NotebookContextType | undefined>(undefined)
