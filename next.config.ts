@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     root: path.resolve(__dirname),
+    resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
   },
   // Disable static export to support dynamic pages with searchParams
   output: undefined, // Use default (not 'export') to enable server-side rendering

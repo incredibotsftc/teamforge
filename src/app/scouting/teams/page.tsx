@@ -10,11 +10,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ClipboardList, Loader2, AlertCircle, Trophy, Activity, BarChart3, TrendingUp, X, StickyNote, Award, Calendar, MapPin } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ClipboardList, Loader2, AlertCircle, Trophy, Activity, BarChart3, TrendingUp, X, StickyNote, Award, Calendar, MapPin, ArrowLeft } from 'lucide-react'
 import type { FTCMatch } from '@/lib/ftcEventsService'
 import { PerformanceLineChart, ScoreBreakdownChart, EventComparisonChart } from '@/components/scouting/TeamMatchCharts'
 import { ScoutingTeamNotes } from '@/components/scouting/ScoutingTeamNotes'
 import { ScoutingSearchBar } from '@/components/scouting/ScoutingSearchBar'
+import { MatchDetailPanel } from '@/components/scouting/MatchDetailPanel'
 
 interface TeamInfo {
   teamNumber: number
@@ -99,6 +101,9 @@ function ScoutingTeamsPageContent() {
     events?: TeamEvent[]
   }>>([])
   const [showNotesSidebar, setShowNotesSidebar] = useState(false)
+  const [selectedMatchForDetails, setSelectedMatchForDetails] = useState<(FTCMatch & { eventName: string; matchLabel: string; date: string }) | null>(null)
+  const [selectedMatchTeamNumber, setSelectedMatchTeamNumber] = useState<number | null>(null)
+  const [teamsLookup, setTeamsLookup] = useState<Map<number, TeamInfo>>(new Map())
 
   // Use refs to track loading state and prevent infinite loops
   const currentLoadKeyRef = React.useRef<string>('')
@@ -278,6 +283,44 @@ function ScoutingTeamsPageContent() {
         if (currentLoadKeyRef.current === loadKey) {
           clearTimeout(safetyTimeout)
           setTeamsData(results)
+
+          // Build teams lookup from all teams in all matches
+          const lookup = new Map<number, TeamInfo>()
+          results.forEach(result => {
+            // Add the main team
+            if (result.teamInfo) {
+              lookup.set(result.teamNumber, result.teamInfo)
+            }
+            // Add all opponent teams from matches
+            result.matches.forEach(match => {
+              match.teams?.forEach(team => {
+                if (!lookup.has(team.teamNumber)) {
+                  // Placeholder - will be fetched from database
+                  lookup.set(team.teamNumber, {
+                    teamNumber: team.teamNumber,
+                    nameFull: `Team ${team.teamNumber}`,
+                    nameShort: `${team.teamNumber}`,
+                    schoolName: 'Loading...',
+                    city: '',
+                    stateProv: '',
+                    country: '',
+                    rookieYear: 0,
+                    website: null
+                  })
+                }
+              })
+            })
+          })
+          setTeamsLookup(lookup)
+
+          // Batch fetch missing team details
+          const missingTeamNumbers = Array.from(lookup.keys()).filter(num =>
+            lookup.get(num)?.schoolName === 'Loading...'
+          )
+          if (missingTeamNumbers.length > 0) {
+            fetchMissingTeamDetails(missingTeamNumbers, lookup)
+          }
+
           setLoading(false)
 
           // Cache the results in sessionStorage
@@ -308,6 +351,43 @@ function ScoutingTeamsPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamNumbersParam, selectedSeason])
 
+  // Batch fetch missing team details from database cache
+  const fetchMissingTeamDetails = async (teamNumbers: number[], currentLookup: Map<number, TeamInfo>) => {
+    try {
+      // Fetch all teams in one bulk request from the database
+      const response = await fetch('/api/scouting/teams-bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          teamNumbers,
+          season: selectedSeason
+        })
+      })
+
+      if (!response.ok) {
+        console.error('Failed to fetch teams from database')
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.success && data.teams) {
+        // Update the lookup with all fetched teams at once
+        setTeamsLookup((prev) => {
+          const newLookup = new Map(prev)
+          data.teams.forEach((team: TeamInfo) => {
+            newLookup.set(team.teamNumber, team)
+          })
+          return newLookup
+        })
+      }
+    } catch (err) {
+      console.error('Error batch fetching team details:', err)
+    }
+  }
+
   // Handle season change
   const handleSeasonChange = (newSeason: string) => {
     const params = new URLSearchParams()
@@ -333,12 +413,23 @@ function ScoutingTeamsPageContent() {
 
   // Header actions
   const actions = (
-    <ScoutingSearchBar
-      selectedSeason={selectedSeason}
-      availableSeasons={availableSeasons}
-      onSeasonChange={handleSeasonChange}
-      onError={(error) => setError(error)}
-    />
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => router.push('/scouting')}
+        className="flex items-center gap-2"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Scouting
+      </Button>
+      <ScoutingSearchBar
+        selectedSeason={selectedSeason}
+        availableSeasons={availableSeasons}
+        onSeasonChange={handleSeasonChange}
+        onError={(error) => setError(error)}
+      />
+    </div>
   )
 
   if (loading) {
@@ -488,7 +579,7 @@ function ScoutingTeamsPageContent() {
                           <h3 className="text-lg font-semibold">
                             {team.teamInfo?.nameShort || team.teamInfo?.nameFull || `Team ${team.teamNumber}`} (#{team.teamNumber})
                           </h3>
-                          <PerformanceLineChart matches={team.matches} teamNumber={team.teamNumber} />
+                          <PerformanceLineChart matches={team.matches} teamNumber={team.teamNumber} teamsLookup={teamsLookup} />
                         </div>
                       ))}
                     </div>
@@ -501,7 +592,7 @@ function ScoutingTeamsPageContent() {
                           <h3 className="text-lg font-semibold">
                             {team.teamInfo?.nameShort || team.teamInfo?.nameFull || `Team ${team.teamNumber}`} (#{team.teamNumber})
                           </h3>
-                          <ScoreBreakdownChart matches={team.matches} teamNumber={team.teamNumber} />
+                          <ScoreBreakdownChart matches={team.matches} teamNumber={team.teamNumber} teamsLookup={teamsLookup} />
                         </div>
                       ))}
                     </div>
@@ -514,7 +605,7 @@ function ScoutingTeamsPageContent() {
                           <h3 className="text-lg font-semibold">
                             {team.teamInfo?.nameShort || team.teamInfo?.nameFull || `Team ${team.teamNumber}`} (#{team.teamNumber})
                           </h3>
-                          <EventComparisonChart matches={team.matches} teamNumber={team.teamNumber} />
+                          <EventComparisonChart matches={team.matches} teamNumber={team.teamNumber} teamsLookup={teamsLookup} />
                         </div>
                       ))}
                     </div>
@@ -831,7 +922,7 @@ function ScoutingTeamsPageContent() {
                         <p className="text-sm text-muted-foreground">
                           Alliance scores across all matches with trend line. Points colored by result (Win/Loss/Tie).
                         </p>
-                        <PerformanceLineChart matches={teamMatches} teamNumber={currentTeamNumber} />
+                        <PerformanceLineChart matches={teamMatches} teamNumber={currentTeamNumber} teamsLookup={teamsLookup} />
                       </div>
                     </TabsContent>
 
@@ -841,7 +932,7 @@ function ScoutingTeamsPageContent() {
                         <p className="text-sm text-muted-foreground">
                           Stacked breakdown of Auto and Teleop+Endgame contributions to alliance score.
                         </p>
-                        <ScoreBreakdownChart matches={teamMatches} teamNumber={currentTeamNumber} />
+                        <ScoreBreakdownChart matches={teamMatches} teamNumber={currentTeamNumber} teamsLookup={teamsLookup} />
                       </div>
                     </TabsContent>
 
@@ -851,7 +942,7 @@ function ScoutingTeamsPageContent() {
                         <p className="text-sm text-muted-foreground">
                           Average alliance scores across all events attended this season.
                         </p>
-                        <EventComparisonChart matches={teamMatches} teamNumber={currentTeamNumber} />
+                        <EventComparisonChart matches={teamMatches} teamNumber={currentTeamNumber} teamsLookup={teamsLookup} />
                       </div>
                     </TabsContent>
 
@@ -954,7 +1045,22 @@ function ScoutingTeamsPageContent() {
                             const endgameScore = isRedAlliance ? match.scoreRedEndgame : match.scoreBlueEndgame
 
                             return (
-                              <TableRow key={`${match.eventCode}-${match.tournamentLevel}-${match.matchNumber}-${index}`}>
+                              <TableRow
+                                key={`${match.eventCode}-${match.tournamentLevel}-${match.matchNumber}-${index}`}
+                                className="cursor-pointer hover:bg-accent/50 transition-colors"
+                                onClick={() => {
+                                  setSelectedMatchForDetails({
+                                    ...match,
+                                    matchLabel: `${match.tournamentLevel === 'qual' ? 'Q' : 'P'}${match.matchNumber}`,
+                                    date: new Date(match.actualStartTime || match.startTime).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })
+                                  })
+                                  setSelectedMatchTeamNumber(currentTeamNumber)
+                                }}
+                              >
                                 <TableCell className="text-sm">
                                   {new Date(match.actualStartTime || match.startTime).toLocaleDateString('en-US', {
                                     month: 'short',
@@ -1169,6 +1275,22 @@ function ScoutingTeamsPageContent() {
             )
           })()}
         </div>
+
+        {/* Match Details Dialog */}
+        <Dialog open={!!selectedMatchForDetails} onOpenChange={(open) => !open && setSelectedMatchForDetails(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Match Details</DialogTitle>
+            </DialogHeader>
+            {selectedMatchForDetails && selectedMatchTeamNumber && (
+              <MatchDetailPanel
+                match={selectedMatchForDetails}
+                teamNumber={selectedMatchTeamNumber}
+                teamsLookup={teamsLookup}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Scouting Notes Sidebar */}
         {showNotesSidebar && teamInfo && (
