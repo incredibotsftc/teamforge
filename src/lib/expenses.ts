@@ -45,7 +45,10 @@ export async function createExpense(expense: Omit<NewExpense, 'teamId'>, teamId:
 export async function getTeamExpenses(teamId: string, seasonId: string) {
   const { data, error } = await supabase
     .from('expenses')
-    .select('*')
+    .select(`
+      *,
+      vendor:vendors(id, name)
+    `)
     .eq('team_id', teamId)
     .eq('season_id', seasonId)
     .order('date', { ascending: false })

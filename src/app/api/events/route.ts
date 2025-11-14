@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-auth'
 import { handleAPIError, ValidationError } from '@/lib/api-errors'
 
+// Helper function to format date as YYYY-MM-DD in local timezone
+function formatLocalDate(date: Date): string {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
+
 // Helper function to generate recurring event instances
 function generateRecurringInstances(
-    parentEvent: { start_date: string; end_date: string; [key: string]: unknown },
+    parentEvent: { start_date: string; [key: string]: unknown },
     recurrenceType: string,
     interval: number,
     daysOfWeek: number[] | null,
@@ -12,9 +20,14 @@ function generateRecurringInstances(
     maxCount: number | null
 ) {
     const instances = []
-    const startDate = new Date(parentEvent.start_date)
-    const endLimit = endDate ? new Date(endDate) : null
-    const countLimit = maxCount || 365 // Default max to prevent infinite loops
+    // Parse date in local timezone by splitting the string
+    const [year, month, day] = parentEvent.start_date.split('-').map(Number)
+    const startDate = new Date(year, month - 1, day)
+    const endLimit = endDate ? (() => {
+        const [y, m, d] = endDate.split('-').map(Number)
+        return new Date(y, m - 1, d)
+    })() : null
+    const countLimit = maxCount || 52 // Default to 52 occurrences (1 year of weekly events)
 
     const currentDate = new Date(startDate)
     let instanceCount = 0
@@ -52,7 +65,7 @@ function generateRecurringInstances(
                     instances.push({
                         title: parentEvent.title,
                         event_type: parentEvent.event_type,
-                        start_date: instanceDate.toISOString().split('T')[0],
+                        start_date: formatLocalDate(instanceDate),
                         start_time: parentEvent.start_time,
                         end_time: parentEvent.end_time,
                         location: parentEvent.location,
@@ -75,7 +88,7 @@ function generateRecurringInstances(
             instances.push({
                 title: parentEvent.title,
                 event_type: parentEvent.event_type,
-                start_date: currentDate.toISOString().split('T')[0],
+                start_date: formatLocalDate(currentDate),
                 start_time: parentEvent.start_time,
                 end_time: parentEvent.end_time,
                 location: parentEvent.location,
@@ -187,8 +200,7 @@ export async function POST(request: NextRequest) {
                         .insert(instances)
 
                     if (instancesError) {
-                        console.error('Error creating recurring instances:', instancesError)
-                        // Don't fail the main request, just log the error
+                        throw new Error(`Failed to create recurring instances: ${instancesError.message}`)
                     }
                 }
             }
