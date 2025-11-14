@@ -50,12 +50,14 @@ export function ExpenseList({ expenses, onEdit, searchQuery }: ExpenseListProps)
     const category = getCategoryName(expense.category).toLowerCase()
     const date = parseLocalDate(expense.date).toLocaleDateString().toLowerCase()
     const amount = expense.amount.toString()
+    const vendor = (expense.vendor?.name || '').toLowerCase()
 
     return (
       description.includes(searchLower) ||
       category.includes(searchLower) ||
       date.includes(searchLower) ||
-      amount.includes(searchLower)
+      amount.includes(searchLower) ||
+      vendor.includes(searchLower)
     )
   })
 
@@ -82,6 +84,7 @@ export function ExpenseList({ expenses, onEdit, searchQuery }: ExpenseListProps)
           <TableHead>Date</TableHead>
           <TableHead>Description</TableHead>
           <TableHead>Category</TableHead>
+          <TableHead>Vendor</TableHead>
           <TableHead className="text-right">Amount</TableHead>
           <TableHead className="w-[50px]"></TableHead>
         </TableRow>
@@ -99,6 +102,9 @@ export function ExpenseList({ expenses, onEdit, searchQuery }: ExpenseListProps)
             <TableCell className="font-medium">{expense.description}</TableCell>
             <TableCell className="text-muted-foreground">
               {getCategoryName(expense.category)}
+            </TableCell>
+            <TableCell className="text-muted-foreground">
+              {expense.vendor?.name || '—'}
             </TableCell>
             <TableCell className="text-right tabular-nums font-medium">
               ${Number(expense.amount).toLocaleString()}

@@ -8,9 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { VendorAutocomplete } from '@/components/budget/VendorAutocomplete'
 import { supabase } from '@/lib/supabase'
 import { useTeamData } from '@/hooks/useTeamData'
 import { useAppData } from '@/components/AppDataProvider'
+import { useAuth } from '@/components/AuthProvider'
+import { getOrCreateVendor, getVendorById } from '@/lib/vendors'
 import { CalendarIcon, Loader2, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -43,10 +46,12 @@ interface ExpenseFormContentProps {
 export function ExpenseFormContent({ expenseId, mode, onSuccess }: ExpenseFormContentProps) {
   const { team } = useTeamData()
   const { currentSeason } = useAppData()
+  const { user } = useAuth()
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [date, setDate] = useState<Date | undefined>(new Date())
+  const [vendorName, setVendorName] = useState('')
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -85,6 +90,15 @@ export function ExpenseFormContent({ expenseId, mode, onSuccess }: ExpenseFormCo
         } else {
           setDate(new Date())
         }
+
+        // Load vendor name if vendor_id exists
+        if (data.vendor_id) {
+          const vendor = await getVendorById(data.vendor_id)
+          if (vendor) {
+            setVendorName(vendor.name)
+          }
+        }
+
         setNotes(data.notes || '')
       }
     } catch (err) {
@@ -132,11 +146,18 @@ export function ExpenseFormContent({ expenseId, mode, onSuccess }: ExpenseFormCo
     setError('')
 
     try {
+      // Handle vendor - get or create vendor ID
+      let vendorId: string | null = null
+      if (vendorName.trim()) {
+        vendorId = await getOrCreateVendor(team.id, vendorName.trim(), user?.id)
+      }
+
       const expenseData = {
         description: description.trim(),
         amount: Number(amount),
         category,
         date: formatDateForDB(date),
+        vendor_id: vendorId,
         notes: notes.trim() || null,
         team_id: team.id,
         season_id: currentSeason.id,
@@ -251,6 +272,27 @@ export function ExpenseFormContent({ expenseId, mode, onSuccess }: ExpenseFormCo
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="vendor">Vendor (optional)</Label>
+          {team?.id ? (
+            <VendorAutocomplete
+              teamId={team.id}
+              value={vendorName}
+              onChange={setVendorName}
+              placeholder="Enter vendor or supplier name"
+              disabled={isSubmitting || isDeleting}
+            />
+          ) : (
+            <Input
+              id="vendor"
+              placeholder="Enter vendor or supplier name"
+              value={vendorName}
+              onChange={(e) => setVendorName(e.target.value)}
+              disabled
+            />
+          )}
         </div>
 
         <div className="space-y-2">

@@ -33,21 +33,27 @@ export function useAccentColor() {
 
   // Apply accent color to CSS variables
   const applyAccentColor = (color: string) => {
-    const root = document.documentElement;
-    const rgb = hexToRgb(color);
-    
-    // Set main accent color
-    root.style.setProperty('--accent-color', color);
-    root.style.setProperty('--accent-color-rgb', rgb);
-    
-    // Generate hover and light/dark variants
-    const hoverColor = adjustBrightness(color, 10);
-    const lightColor = adjustBrightness(color, 40);
-    const darkColor = adjustBrightness(color, -40);
-    
-    root.style.setProperty('--accent-color-hover', hoverColor);
-    root.style.setProperty('--accent-color-light', lightColor);
-    root.style.setProperty('--accent-color-dark', darkColor);
+    try {
+      if (!color || typeof color !== 'string') return;
+
+      const root = document.documentElement;
+      const rgb = hexToRgb(color);
+
+      // Set main accent color
+      root.style.setProperty('--accent-color', color);
+      root.style.setProperty('--accent-color-rgb', rgb);
+
+      // Generate hover and light/dark variants
+      const hoverColor = adjustBrightness(color, 10);
+      const lightColor = adjustBrightness(color, 40);
+      const darkColor = adjustBrightness(color, -40);
+
+      root.style.setProperty('--accent-color-hover', hoverColor);
+      root.style.setProperty('--accent-color-light', lightColor);
+      root.style.setProperty('--accent-color-dark', darkColor);
+    } catch (error) {
+      console.error('Error applying accent color:', error);
+    }
   };
 
   // Update accent color and apply to DOM

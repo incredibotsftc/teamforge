@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "description": "Migration metadata that maps app versions to migration files and release notes",
+  "migrations": {
+    "1.0.0": {
+      "migration": "0001_init.sql",
+      "releaseNotes": "/releases/v1.0.0.md",
+      "description": "Initial baseline release with all core features",
+      "requiresVerification": false,
+      "verificationScript": null,
+      "estimatedTime": "2-3 minutes",
+      "dependencies": []
+    },
+    "1.1.0": {
+      "migration": "0002_add_version_tracking.sql",
+      "releaseNotes": "/releases/v1.1.0.md",
+      "description": "Add version tracking and vendor management",
+      "requiresVerification": true,
+      "verificationScript": "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'schema_versions') AS schema_versions_exists, EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'migration_history') AS migration_history_exists, EXISTS (SELECT FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid WHERE n.nspname = 'public' AND p.proname = 'get_current_db_version') AS get_current_db_version_exists, EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'vendors') AS vendors_table_exists, EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'expenses' AND column_name = 'vendor_id') AS vendor_id_column_exists;",
+      "estimatedTime": "45 seconds",
+      "dependencies": ["1.0.0"]
+    }
+  },
+  "versionOrder": ["1.0.0", "1.1.0"]
+}

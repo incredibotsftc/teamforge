@@ -16,6 +16,12 @@ export interface Expense {
   amount: number
   category: ExpenseCategory
   date: string
+  vendor_id?: string | null
+  vendor?: {
+    id: string
+    name: string
+  } | null
+  notes?: string | null
   created_at: string
   created_by: string
 }

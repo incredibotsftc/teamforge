@@ -20,7 +20,8 @@ import { ExpensePieChart } from '@/components/budget/ExpensePieChart'
 import { ExpenseBarChart } from '@/components/budget/ExpenseBarChart'
 import { FundraisingList } from '@/components/budget/FundraisingList'
 import { FundraisingSourceChart } from '@/components/budget/FundraisingSourceChart'
-import { Plus, DollarSign, TrendingUp } from 'lucide-react'
+import { ExportExpensesDialog } from '@/components/budget/ExportExpensesDialog'
+import { Plus, DollarSign, TrendingUp, Download } from 'lucide-react'
 
 function Page() {
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -33,6 +34,7 @@ function Page() {
   const [editingFundraisingId, setEditingFundraisingId] = useState<string | null>(null)
   const [fundraisingSearch, setFundraisingSearch] = useState('')
   const [expenseSearch, setExpenseSearch] = useState('')
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
 
   useEffect(() => {
     if (currentTeam?.id && currentSeason?.id) {
@@ -111,6 +113,10 @@ function Page() {
 
   const actions = (
     <div className="flex gap-2">
+      <Button variant="outline" onClick={() => setIsExportDialogOpen(true)}>
+        <Download className="w-4 h-4 mr-2" />
+        Export CSV
+      </Button>
       <Button className="btn-accent" onClick={handleOpenCreateFundraising}>
         <TrendingUp className="w-4 h-4 mr-2" />
         Track Fundraising
@@ -298,6 +304,14 @@ function Page() {
           />
         </SheetContent>
       </Sheet>
+
+      {/* Export Expenses Dialog */}
+      <ExportExpensesDialog
+        open={isExportDialogOpen}
+        onOpenChange={setIsExportDialogOpen}
+        expenses={expenses}
+        teamName={currentTeam?.team_name}
+      />
     </DashboardLayout>
   )
 }

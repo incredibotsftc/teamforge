@@ -33,7 +33,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           <CardContent className="flex flex-col items-center justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-4" />
             <h2 className="text-lg font-semibold mb-2">Loading...</h2>
-            <p className="text-muted-foreground text-center">Checking authentication status</p>
           </CardContent>
         </Card>
       </div>

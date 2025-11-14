@@ -3,31 +3,41 @@ import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { rateLimit, RateLimitPresets } from '@/lib/rateLimit'
 import { supabase } from '@/lib/supabase'
-
-// List of consolidated migration files in order
-const MIGRATION_FILES = [
-    '0001_init.sql'
-]
+import migrationMetadata from '../../../../database/migrations/metadata.json'
 
 async function getMigrationSQL(): Promise<string> {
     const allMigrations = []
 
-    for (const filename of MIGRATION_FILES) {
+    // Get all migrations in order from metadata.json
+    for (const version of migrationMetadata.versionOrder) {
+        const metadata = migrationMetadata.migrations[version as keyof typeof migrationMetadata.migrations]
+        if (!metadata) {
+            console.error(`Metadata not found for version ${version}`)
+            continue
+        }
+
         try {
-            const migrationPath = join(process.cwd(), 'database', 'migrations', filename)
+            const migrationPath = join(process.cwd(), 'database', 'migrations', metadata.migration)
             const migrationSQL = await readFile(migrationPath, 'utf-8')
 
             // Extract only the UP section (everything before -- DOWN:)
             const upSection = migrationSQL.split('-- DOWN:')[0]
 
             // Add migration marker
-            allMigrations.push(`-- Running migration: ${filename}`)
+            allMigrations.push(`-- ========================================`)
+            allMigrations.push(`-- Migration: ${version}`)
+            allMigrations.push(`-- File: ${metadata.migration}`)
+            allMigrations.push(`-- Description: ${metadata.description}`)
+            allMigrations.push(`-- ========================================`)
+            allMigrations.push('')
             allMigrations.push(upSection.trim())
+            allMigrations.push('')
+            allMigrations.push(`-- Migration ${version} completed`)
             allMigrations.push('') // Empty line for separation
 
         } catch (error) {
-            console.error(`Failed to read migration ${filename}:`, error)
-            throw new Error(`Failed to read migration ${filename}`)
+            console.error(`Failed to read migration ${metadata.migration}:`, error)
+            throw new Error(`Failed to read migration ${metadata.migration}`)
         }
     }
 
