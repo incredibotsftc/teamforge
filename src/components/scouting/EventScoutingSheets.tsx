@@ -1,12 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import React, { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { Loader2, FileText, ChevronLeft, ChevronRight, Save } from 'lucide-react'
 import { FieldAnnotation } from './FieldAnnotation'
 import { supabase } from '@/lib/supabase'
@@ -24,12 +24,15 @@ interface Question {
   mandatory?: boolean
 }
 
+// Response value can be various types based on question type
+type ResponseValue = string | number | string[] | null | undefined
+
 interface ScoutingResponse {
   id: string
   scouting_team_number: number | null
   scouting_event_id: string | null
   questions: Question[]
-  responses: Record<string, any>
+  responses: Record<string, ResponseValue>
   created_at: string
   created_by: string
   metadata: {
@@ -65,7 +68,7 @@ export function EventScoutingSheets({
   eventName,
   seasonId,
   teamNumber,
-  teamName,
+  // teamName is passed but not currently used
   eventTeams,
   open,
   onOpenChange
@@ -77,16 +80,10 @@ export function EventScoutingSheets({
   const [currentIndex, setCurrentIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [editedResponses, setEditedResponses] = useState<Record<string, any>>({})
+  const [editedResponses, setEditedResponses] = useState<Record<string, Record<string, ResponseValue>>>({})
   const [uploadingImages, setUploadingImages] = useState<Record<string, boolean>>({})
 
-  useEffect(() => {
-    if (open && eventCode) {
-      fetchResponses()
-    }
-  }, [open, eventCode, seasonId, teamNumber, teamName])
-
-  const fetchResponses = async () => {
+  const fetchResponses = useCallback(async () => {
     setLoading(true)
     setError(null)
     setCurrentIndex(0)
@@ -116,24 +113,36 @@ export function EventScoutingSheets({
 
       const templateQuestions = template.content.questions
 
-      // Fetch existing responses
-      const params = new URLSearchParams({ eventCode })
+      // Fetch existing responses directly from Supabase
+      let responsesQuery = supabase
+        .from('scouting_responses')
+        .select(`
+          *,
+          teams:team_id (
+            team_number,
+            team_name
+          )
+        `)
+        .filter('metadata->>event_code', 'eq', eventCode)
+        .order('created_at', { ascending: false })
+
+      // Optionally filter by season
       if (seasonId) {
-        params.set('seasonId', seasonId)
+        responsesQuery = responsesQuery.eq('season_id', seasonId)
       }
 
-      const response = await fetch(`/api/scouting/event-responses?${params.toString()}`)
+      const { data: existingResponses, error: responsesError } = await responsesQuery
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch scouting responses')
+      if (responsesError) {
+        console.error('Error fetching responses:', responsesError)
+        setError('Failed to load existing responses')
+        setLoading(false)
+        return
       }
-
-      const data = await response.json()
-      const existingResponses = data.responses || []
 
       // Create a map of existing responses by team number
       const responseMap = new Map<number, ScoutingResponse>()
-      existingResponses.forEach((r: ScoutingResponse) => {
+      existingResponses?.forEach((r: ScoutingResponse) => {
         if (r.scouting_team_number) {
           responseMap.set(r.scouting_team_number, r)
         }
@@ -182,7 +191,13 @@ export function EventScoutingSheets({
     } finally {
       setLoading(false)
     }
-  }
+  }, [team, currentSeason, eventCode, seasonId, eventTeams, teamNumber, eventName, user])
+
+  useEffect(() => {
+    if (open && eventCode) {
+      fetchResponses()
+    }
+  }, [open, eventCode, fetchResponses])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -209,6 +224,7 @@ export function EventScoutingSheets({
         [currentResponse.id]: currentResponse.responses
       }))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, currentResponse])
 
   const handlePrevious = async () => {
@@ -267,7 +283,7 @@ export function EventScoutingSheets({
       const fileExt = file.name.split('.').pop()
       const fileName = `${team.id}/${currentSeason.id}/scouting-responses/${currentResponse.scouting_team_number}/${questionId}/${timestamp}.${fileExt}`
 
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('scouting-images')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -667,10 +683,13 @@ export function EventScoutingSheets({
                         )}
                         {response && typeof response === 'string' && (
                           <div className="mt-2">
-                            <img
+                            <Image
                               src={response}
                               alt="Uploaded preview"
-                              className="max-w-full h-auto max-h-48 rounded border"
+                              width={400}
+                              height={192}
+                              className="max-w-full h-auto max-h-48 rounded border object-contain"
+                              unoptimized
                             />
                             <Button
                               variant="ghost"

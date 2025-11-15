@@ -16,7 +16,7 @@ const FTC_API_BASE_URL = 'https://ftc-api.firstinspires.org/v2.0'
 let teamsCache: { data: FTCTeam[]; timestamp: number } | null = null
 const CACHE_DURATION = 60 * 60 * 1000 // 1 hour
 
-interface FTCEvent {
+export interface FTCEvent {
   eventId: string
   code: string
   divisionCode: string | null

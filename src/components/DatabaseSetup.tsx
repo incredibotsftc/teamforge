@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, CheckCircle, Database, Loader2, Copy, ExternalLink } from 'lucide-react'
+import { AlertCircle, CheckCircle, Database, Loader2, Copy } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface DatabaseSetupProps {

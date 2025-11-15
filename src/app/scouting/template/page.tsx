@@ -144,7 +144,7 @@ export default function ScoutingSheetPage() {
 
   const validateQuestions = (): string | null => {
     // Check for blank question text
-    const blankQuestion = questions.find((q, idx) => !q.mandatory && !q.text.trim())
+    const blankQuestion = questions.find((q) => !q.mandatory && !q.text.trim())
     if (blankQuestion) {
       const idx = questions.findIndex(q => q.id === blankQuestion.id)
       return `Question ${idx + 1} is blank. Please enter question text.`

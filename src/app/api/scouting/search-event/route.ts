@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit, RateLimitPresets } from '@/lib/rateLimit'
-import { ftcEventsService, type FTCRanking } from '@/lib/ftcEventsService'
+import { ftcEventsService, type FTCEvent, type FTCRanking } from '@/lib/ftcEventsService'
 
 export async function GET(request: NextRequest) {
   // Apply rate limiting
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Use provided season or fall back to current season
     const season = seasonParam || await ftcEventsService.getCurrentSeason()
 
-    let events: any[] = []
+    let events: FTCEvent[] = []
 
     // If eventCode parameter is used, search by code (for events page)
     if (eventCode) {

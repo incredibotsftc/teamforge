@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -205,7 +206,7 @@ export function FillScoutingSheet({
       const fileName = `${team.id}/${currentSeason.id}/scouting-responses/${teamNumber}/${questionId}/${timestamp}.${fileExt}`
 
       // Upload to Supabase storage
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('scouting-images')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -246,7 +247,7 @@ export function FillScoutingSheet({
     setIsUserTyping(false) // Reset typing flag when event is selected
 
     // When event changes, check if there's an existing response for this event
-    if (team?.id && currentSeason?.id && newEventId) {
+    if (team?.id && currentSeason?.id && event.code) {
       try {
         const { data: existingResponse, error } = await supabase
           .from('scouting_responses')
@@ -254,7 +255,7 @@ export function FillScoutingSheet({
           .eq('team_id', team.id)
           .eq('season_id', currentSeason.id)
           .eq('scouting_team_number', teamNumber)
-          .eq('scouting_event_id', newEventId)
+          .eq('scouting_event_id', event.code)
           .maybeSingle()
 
         if (!error && existingResponse) {
@@ -564,10 +565,13 @@ export function FillScoutingSheet({
                         )}
                         {responses[q.id] && typeof responses[q.id] === 'string' && (
                           <div className="mt-2">
-                            <img
+                            <Image
                               src={responses[q.id] as string}
                               alt="Uploaded preview"
-                              className="max-w-full h-auto max-h-48 rounded border"
+                              width={400}
+                              height={192}
+                              className="max-w-full h-auto max-h-48 rounded border object-contain"
+                              unoptimized
                             />
                             <Button
                               variant="ghost"

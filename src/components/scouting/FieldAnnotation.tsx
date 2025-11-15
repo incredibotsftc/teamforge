@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Pencil, Eraser, Undo, Trash2 } from 'lucide-react'
 
@@ -42,6 +42,61 @@ export function FieldAnnotation({ value, onChange, disabled }: FieldAnnotationPr
   const [currentStroke, setCurrentStroke] = useState<DrawingPoint[]>([])
   const [imageLoaded, setImageLoaded] = useState(false)
   const [baseAnnotation, setBaseAnnotation] = useState<string | null>(null)
+
+  const drawStrokes = useCallback((ctx: CanvasRenderingContext2D) => {
+    // Redraw all strokes
+    strokes.forEach(stroke => {
+      if (stroke.points.length === 0) return
+
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+
+      stroke.points.forEach((point, index) => {
+        if (index === 0) {
+          ctx.beginPath()
+          ctx.moveTo(point.x, point.y)
+        } else {
+          if (point.type === 'erase') {
+            ctx.globalCompositeOperation = 'destination-out'
+            ctx.strokeStyle = 'rgba(0,0,0,1)'
+            ctx.lineWidth = 20
+          } else {
+            ctx.globalCompositeOperation = 'source-over'
+            ctx.strokeStyle = point.color
+            ctx.lineWidth = point.size
+          }
+
+          ctx.lineTo(point.x, point.y)
+          ctx.stroke()
+        }
+      })
+    })
+
+    // Draw current stroke
+    if (currentStroke.length > 0) {
+      ctx.beginPath()
+      currentStroke.forEach((point, index) => {
+        if (index === 0) {
+          ctx.moveTo(point.x, point.y)
+        } else {
+          if (point.type === 'erase') {
+            ctx.globalCompositeOperation = 'destination-out'
+            ctx.strokeStyle = 'rgba(0,0,0,1)'
+            ctx.lineWidth = 20
+          } else {
+            ctx.globalCompositeOperation = 'source-over'
+            ctx.strokeStyle = point.color
+            ctx.lineWidth = point.size
+          }
+
+          ctx.lineTo(point.x, point.y)
+          ctx.stroke()
+        }
+      })
+    }
+
+    ctx.globalCompositeOperation = 'source-over'
+  }, [strokes, currentStroke])
 
   // Load field image and existing annotations
   useEffect(() => {
@@ -109,62 +164,7 @@ export function FieldAnnotation({ value, onChange, disabled }: FieldAnnotationPr
         drawStrokes(ctx)
       }
     }
-  }, [strokes, currentStroke, imageLoaded, baseAnnotation])
-
-  const drawStrokes = (ctx: CanvasRenderingContext2D) => {
-    // Redraw all strokes
-    strokes.forEach(stroke => {
-      if (stroke.points.length === 0) return
-
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-
-      stroke.points.forEach((point, index) => {
-        if (index === 0) {
-          ctx.beginPath()
-          ctx.moveTo(point.x, point.y)
-        } else {
-          if (point.type === 'erase') {
-            ctx.globalCompositeOperation = 'destination-out'
-            ctx.strokeStyle = 'rgba(0,0,0,1)'
-            ctx.lineWidth = 20
-          } else {
-            ctx.globalCompositeOperation = 'source-over'
-            ctx.strokeStyle = point.color
-            ctx.lineWidth = point.size
-          }
-
-          ctx.lineTo(point.x, point.y)
-          ctx.stroke()
-        }
-      })
-    })
-
-    // Draw current stroke
-    if (currentStroke.length > 0) {
-      ctx.beginPath()
-      currentStroke.forEach((point, index) => {
-        if (index === 0) {
-          ctx.moveTo(point.x, point.y)
-        } else {
-          if (point.type === 'erase') {
-            ctx.globalCompositeOperation = 'destination-out'
-            ctx.strokeStyle = 'rgba(0,0,0,1)'
-            ctx.lineWidth = 20
-          } else {
-            ctx.globalCompositeOperation = 'source-over'
-            ctx.strokeStyle = point.color
-            ctx.lineWidth = point.size
-          }
-
-          ctx.lineTo(point.x, point.y)
-          ctx.stroke()
-        }
-      })
-    }
-
-    ctx.globalCompositeOperation = 'source-over'
-  }
+  }, [strokes, currentStroke, imageLoaded, baseAnnotation, drawStrokes])
 
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
