@@ -278,23 +278,22 @@ export function ScoutingSearchBar({
             </div>
           </PopoverContent>
         </Popover>
-        <Input
-          type="text"
-          placeholder={searchType === 'team' ? 'Team #...' : 'Event...'}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={searchLoading}
-          className="flex-1 min-w-0"
-        />
-        <Button
-          onClick={handleSearch}
-          disabled={searchLoading || !searchQuery.trim()}
-          className="btn-accent flex-shrink-0"
-          size="sm"
-        >
-          {searchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-        </Button>
+        <div className="relative flex-1 min-w-0">
+          <Input
+            type="text"
+            placeholder={searchType === 'team' ? 'Team #...' : 'Event...'}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={searchLoading}
+            className="w-full pr-8"
+          />
+          {searchLoading && (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Desktop View - Full Horizontal Layout */}

@@ -6,15 +6,20 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { useAppData } from '@/components/AppDataProvider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ClipboardList, Loader2, AlertCircle, Trophy, Activity, BarChart3, TrendingUp, X, StickyNote, Award, Calendar, MapPin } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { ClipboardList, Loader2, AlertCircle, FileText, Award, BarChart3, MoreVertical } from 'lucide-react'
 import type { FTCMatch } from '@/lib/ftcEventsService'
 import { PerformanceLineChart, ScoreBreakdownChart, EventComparisonChart } from '@/components/scouting/TeamMatchCharts'
 import { ScoutingTeamNotes } from '@/components/scouting/ScoutingTeamNotes'
 import { ScoutingSearchBar } from '@/components/scouting/ScoutingSearchBar'
+import { FillScoutingSheet } from '@/components/scouting/FillScoutingSheet'
+import { TeamHeader } from '@/components/scouting/TeamHeader'
+import { TeamStats } from '@/components/scouting/TeamStats'
+import { TeamComparisonCard } from '@/components/scouting/TeamComparisonCard'
+import { TeamPerformanceTabs } from '@/components/scouting/TeamPerformanceTabs'
+import { TeamEventsCard } from '@/components/scouting/TeamEventsCard'
 
 interface TeamInfo {
   teamNumber: number
@@ -99,6 +104,7 @@ function ScoutingTeamsPageContent() {
     events?: TeamEvent[]
   }>>([])
   const [showNotesSidebar, setShowNotesSidebar] = useState(false)
+  const [showFillScoutingSheet, setShowFillScoutingSheet] = useState(false)
 
   // Use refs to track loading state and prevent infinite loops
   const currentLoadKeyRef = React.useRef<string>('')
@@ -333,12 +339,39 @@ function ScoutingTeamsPageContent() {
 
   // Header actions
   const actions = (
-    <ScoutingSearchBar
-      selectedSeason={selectedSeason}
-      availableSeasons={availableSeasons}
-      onSeasonChange={handleSeasonChange}
-      onError={(error) => setError(error)}
-    />
+    <div className="flex items-center gap-2 w-full md:w-auto">
+      <ScoutingSearchBar
+        selectedSeason={selectedSeason}
+        availableSeasons={availableSeasons}
+        onSeasonChange={handleSeasonChange}
+        onError={(error) => setError(error)}
+      />
+
+      {/* Desktop: Full button */}
+      <Button
+        size="sm"
+        onClick={() => router.push('/scouting/template')}
+        className="hidden md:flex whitespace-nowrap btn-accent"
+      >
+        <FileText className="mr-2 h-4 w-4" />
+        Scouting Template
+      </Button>
+
+      {/* Mobile: Dropdown menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild className="md:hidden flex-shrink-0">
+          <Button variant="outline" size="sm">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => router.push('/scouting/template')}>
+            <FileText className="mr-2 h-4 w-4" />
+            Scouting Template
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   )
 
   if (loading) {
@@ -408,67 +441,16 @@ function ScoutingTeamsPageContent() {
             <CardContent>
               {/* Team Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {teamsData.map((team) => {
-                  // Calculate stats
-                  let wins = 0, losses = 0, ties = 0, totalScore = 0, scoredMatches = 0
-
-                  team.matches.forEach((match) => {
-                    const teamData = match.teams?.find(t => t.teamNumber === team.teamNumber)
-                    const isRedAlliance = teamData?.station.startsWith('Red')
-                    const allianceScore = isRedAlliance ? match.scoreRedFinal : match.scoreBlueFinal
-                    const opponentScore = isRedAlliance ? match.scoreBlueFinal : match.scoreRedFinal
-
-                    if (allianceScore !== null && opponentScore !== null) {
-                      if (allianceScore > opponentScore) wins++
-                      else if (allianceScore < opponentScore) losses++
-                      else ties++
-                      totalScore += allianceScore
-                      scoredMatches++
-                    }
-                  })
-
-                  const avgScore = scoredMatches > 0 ? Math.round(totalScore / scoredMatches) : 0
-                  const totalMatches = wins + losses + ties
-                  const winRate = totalMatches > 0 ? ((wins / totalMatches) * 100).toFixed(0) : '0'
-
-                  return (
-                    <div key={team.teamNumber} className="border rounded-lg p-4 relative">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="absolute top-2 right-2 h-6 w-6 p-0"
-                        onClick={() => handleRemoveTeam(team.teamNumber)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                      <div className="mb-3">
-                        <h3 className="font-bold text-lg">{team.teamInfo?.nameShort || team.teamInfo?.nameFull || `Team ${team.teamNumber}`}</h3>
-                        <p className="text-sm text-muted-foreground">#{team.teamNumber}</p>
-                        {team.teamInfo?.schoolName && (
-                          <p className="text-xs text-muted-foreground mt-1">{team.teamInfo.schoolName}</p>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Matches:</span>
-                          <span className="font-semibold">{totalMatches}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Win Rate:</span>
-                          <span className="font-semibold">{winRate}%</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Record:</span>
-                          <span className="font-semibold">{wins}-{losses}-{ties}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Avg Score:</span>
-                          <span className="font-semibold">{avgScore}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+                {teamsData.map((team) => (
+                  <TeamComparisonCard
+                    key={team.teamNumber}
+                    teamNumber={team.teamNumber}
+                    teamName={team.teamInfo?.nameShort || team.teamInfo?.nameFull || `Team ${team.teamNumber}`}
+                    schoolName={team.teamInfo?.schoolName}
+                    matches={team.matches}
+                    onRemove={() => handleRemoveTeam(team.teamNumber)}
+                  />
+                ))}
               </div>
 
               {/* Comparison Charts */}
@@ -657,50 +639,53 @@ function ScoutingTeamsPageContent() {
         <div className="space-y-6">
           {/* No matches message */}
           {teamMatches.length === 0 && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-3xl font-bold mb-1">
-                      {teamInfo?.nameShort || teamInfo?.nameFull || `Team ${currentTeamNumber}`}
-                    </CardTitle>
-                    {teamInfo?.schoolName && (
-                      <div className="text-sm text-muted-foreground mb-1">{teamInfo.schoolName}</div>
-                    )}
-                    {teamInfo?.city && teamInfo?.stateProv && (
-                      <div className="text-xs text-muted-foreground mb-2">{teamInfo.city}, {teamInfo.stateProv}</div>
-                    )}
-                  </div>
-                  <div className="text-right flex flex-col items-end gap-2">
-                    <div className="text-2xl font-bold text-muted-foreground">
-                      #{currentTeamNumber}
-                    </div>
-                    {teamInfo?.rookieYear && (
-                      <div className="text-xs text-muted-foreground">
-                        Rookie: {teamInfo.rookieYear}
-                      </div>
-                    )}
-                    <Button
-                      onClick={() => setShowNotesSidebar(true)}
-                      className="btn-accent mt-2"
-                      size="sm"
-                    >
-                      <StickyNote className="h-4 w-4 mr-2" />
-                      View Notes
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center p-8 text-center">
+            <>
+              {/* Mobile: No card wrapper */}
+              <div className="block sm:hidden">
+                <TeamHeader
+                  teamNumber={currentTeamNumber}
+                  teamName={teamInfo?.nameShort || teamInfo?.nameFull || `Team ${currentTeamNumber}`}
+                  schoolName={teamInfo?.schoolName}
+                  location={teamInfo?.city && teamInfo?.stateProv ? `${teamInfo.city}, ${teamInfo.stateProv}` : undefined}
+                  rookieYear={teamInfo?.rookieYear}
+                  onViewNotes={() => setShowNotesSidebar(true)}
+                  onFillScoutingSheet={() => setShowFillScoutingSheet(true)}
+                  variant="mobile"
+                />
+                <div className="flex flex-col items-center justify-center py-8 text-center">
                   <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No Match Data</h3>
                   <p className="text-muted-foreground">
                     No match data found for the {selectedSeason} season.
                   </p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+
+              {/* Desktop: Card wrapper */}
+              <Card className="hidden sm:block">
+                <CardHeader>
+                  <TeamHeader
+                    teamNumber={currentTeamNumber}
+                    teamName={teamInfo?.nameShort || teamInfo?.nameFull || `Team ${currentTeamNumber}`}
+                    schoolName={teamInfo?.schoolName}
+                    location={teamInfo?.city && teamInfo?.stateProv ? `${teamInfo.city}, ${teamInfo.stateProv}` : undefined}
+                    rookieYear={teamInfo?.rookieYear}
+                    onViewNotes={() => setShowNotesSidebar(true)}
+                    onFillScoutingSheet={() => setShowFillScoutingSheet(true)}
+                    variant="desktop"
+                  />
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col items-center justify-center p-8 text-center">
+                    <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Match Data</h3>
+                    <p className="text-muted-foreground">
+                      No match data found for the {selectedSeason} season.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
 
           {/* Team Details with Matches */}
@@ -752,422 +737,98 @@ function ScoutingTeamsPageContent() {
             const isImproving = parseFloat(improvement) > 0
 
             return (
-              <Card>
+              <div>
+              {/* Mobile: No card wrapper */}
+              <div className="block sm:hidden space-y-6">
+                <TeamHeader
+                  teamNumber={currentTeamNumber}
+                  teamName={teamName}
+                  schoolName={teamSchool}
+                  location={teamLocation ?? undefined}
+                  rookieYear={teamInfo?.rookieYear}
+                  matchCount={teamMatches.length}
+                  season={selectedSeason}
+                  onViewNotes={() => setShowNotesSidebar(true)}
+                  onFillScoutingSheet={() => setShowFillScoutingSheet(true)}
+                  variant="mobile"
+                />
+
+                <TeamStats
+                  totalMatches={totalMatches}
+                  wins={wins}
+                  losses={losses}
+                  ties={ties}
+                  winRate={winRate}
+                  avgScore={avgScore}
+                  improvement={improvement}
+                  isImproving={isImproving}
+                  variant="mobile"
+                />
+
+                {/* Tabbed Charts and Table */}
+                <TeamPerformanceTabs
+                  matches={teamMatches}
+                  awards={teamAwards}
+                  teamNumber={currentTeamNumber}
+                  season={selectedSeason}
+                />
+              </div>
+
+              {/* Desktop: Card wrapper */}
+              <Card className="hidden sm:block">
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-3xl font-bold mb-1">
-                        {teamName}
-                      </CardTitle>
-                      {teamSchool && (
-                        <div className="text-sm text-muted-foreground mb-1">{teamSchool}</div>
-                      )}
-                      {teamLocation && (
-                        <div className="text-xs text-muted-foreground mb-2">{teamLocation}</div>
-                      )}
-                      <CardDescription className="flex items-center gap-2">
-                        <Trophy className="h-4 w-4" />
-                        {teamMatches.length} matches for the {selectedSeason} season
-                      </CardDescription>
-                    </div>
-                    <div className="text-right flex flex-col items-end gap-2">
-                      <div className="text-2xl font-bold text-muted-foreground">
-                        #{currentTeamNumber}
-                      </div>
-                      {teamInfo?.rookieYear && (
-                        <div className="text-xs text-muted-foreground">
-                          Rookie: {teamInfo.rookieYear}
-                        </div>
-                      )}
-                      <Button
-                        onClick={() => setShowNotesSidebar(true)}
-                        className="btn-accent mt-2"
-                        size="sm"
-                      >
-                        <StickyNote className="h-4 w-4 mr-2" />
-                        View Notes
-                      </Button>
-                    </div>
-                  </div>
+                  <TeamHeader
+                    teamNumber={currentTeamNumber}
+                    teamName={teamName}
+                    schoolName={teamSchool}
+                    location={teamLocation ?? undefined}
+                    rookieYear={teamInfo?.rookieYear}
+                    matchCount={teamMatches.length}
+                    season={selectedSeason}
+                    onViewNotes={() => setShowNotesSidebar(true)}
+                    onFillScoutingSheet={() => setShowFillScoutingSheet(true)}
+                    variant="desktop"
+                  />
                 </CardHeader>
                 <CardContent>
-                  {/* Summary Statistics */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Total Matches</p>
-                      <p className="text-2xl font-bold">{totalMatches}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Win Rate</p>
-                      <p className="text-2xl font-bold">{winRate}%</p>
-                      <p className="text-xs text-muted-foreground">{wins}W - {losses}L - {ties}T</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Avg Score</p>
-                      <p className="text-2xl font-bold">{avgScore}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Improvement</p>
-                      <p className={`text-2xl font-bold ${isImproving ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {isImproving ? '+' : ''}{improvement}%
-                      </p>
-                      <p className="text-xs text-muted-foreground">vs first half</p>
-                    </div>
-                  </div>
+                  <TeamStats
+                    totalMatches={totalMatches}
+                    wins={wins}
+                    losses={losses}
+                    ties={ties}
+                    winRate={winRate}
+                    avgScore={avgScore}
+                    improvement={improvement}
+                    isImproving={isImproving}
+                    variant="desktop"
+                  />
+                  <div className="mb-6" />
 
                   {/* Tabbed Charts and Table */}
-                  <Tabs defaultValue="performance" className="w-full">
-                    <TabsList className="grid w-full grid-cols-5">
-                      <TabsTrigger value="performance"><Activity className="h-4 w-4 mr-1" /><span className="hidden sm:inline">Performance</span></TabsTrigger>
-                      <TabsTrigger value="breakdown"><BarChart3 className="h-4 w-4 mr-1" /><span className="hidden sm:inline">Score Analysis</span></TabsTrigger>
-                      <TabsTrigger value="events"><TrendingUp className="h-4 w-4 mr-1" /><span className="hidden sm:inline">Events</span></TabsTrigger>
-                      <TabsTrigger value="awards"><Award className="h-4 w-4 mr-1" /><span className="hidden sm:inline">Awards</span></TabsTrigger>
-                      <TabsTrigger value="details"><Trophy className="h-4 w-4 mr-1" /><span className="hidden sm:inline">Details</span></TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="performance" className="mt-6">
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-semibold">Performance Over Time</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Alliance scores across all matches with trend line. Points colored by result (Win/Loss/Tie).
-                        </p>
-                        <PerformanceLineChart matches={teamMatches} teamNumber={currentTeamNumber} />
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="breakdown" className="mt-6">
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-semibold">Score Breakdown by Phase</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Stacked breakdown of Auto and Teleop+Endgame contributions to alliance score.
-                        </p>
-                        <ScoreBreakdownChart matches={teamMatches} teamNumber={currentTeamNumber} />
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="events" className="mt-6">
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-semibold">Event Comparison</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Average alliance scores across all events attended this season.
-                        </p>
-                        <EventComparisonChart matches={teamMatches} teamNumber={currentTeamNumber} />
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="awards" className="mt-6">
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-semibold">Awards & Recognitions</h3>
-                        <p className="text-sm text-muted-foreground">
-                          All awards earned by this team during the {selectedSeason} season.
-                        </p>
-                        {teamAwards.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center p-8 text-center">
-                            <Award className="h-12 w-12 text-muted-foreground mb-4" />
-                            <h3 className="text-lg font-semibold mb-2">No Awards Yet</h3>
-                            <p className="text-muted-foreground">
-                              This team has not won any awards in the {selectedSeason} season.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-4 mt-4">
-                            {(() => {
-                              const awardsByEvent = teamAwards.reduce((acc, award) => {
-                                if (!acc[award.eventCode]) {
-                                  acc[award.eventCode] = {
-                                    eventName: award.eventName,
-                                    eventCity: award.eventCity,
-                                    eventState: award.eventState,
-                                    eventDate: award.eventStart,
-                                    awards: []
-                                  }
-                                }
-                                acc[award.eventCode].awards.push(award)
-                                return acc
-                              }, {} as Record<string, { eventName: string; eventCity: string; eventState: string; eventDate: string; awards: FTCAward[] }>)
-
-                              return Object.entries(awardsByEvent).map(([eventCode, eventData]) => (
-                                <Card key={eventCode} className="border-l-4 border-l-yellow-500">
-                                  <CardHeader className="pb-3">
-                                    <div className="flex items-start justify-between">
-                                      <div>
-                                        <CardTitle className="text-base font-semibold">{eventData.eventName}</CardTitle>
-                                        <CardDescription className="text-xs">
-                                          {eventData.eventCity}, {eventData.eventState} • {new Date(eventData.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </CardDescription>
-                                      </div>
-                                      <Badge variant="secondary" className="ml-2">
-                                        {eventData.awards.length} {eventData.awards.length === 1 ? 'Award' : 'Awards'}
-                                      </Badge>
-                                    </div>
-                                  </CardHeader>
-                                  <CardContent>
-                                    <div className="space-y-2">
-                                      {eventData.awards.map((award, index) => (
-                                        <div key={`${award.awardId}-${index}`} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                                          <Award className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
-                                          <div className="flex-1 min-w-0">
-                                            <div className="font-medium text-sm">{award.name}</div>
-                                            {award.personName && (
-                                              <div className="text-xs text-muted-foreground mt-1">
-                                                Recipient: {award.personName}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              ))
-                            })()}
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="details" className="mt-6">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Event</TableHead>
-                            <TableHead>Match</TableHead>
-                            <TableHead>Alliance</TableHead>
-                            <TableHead>Score</TableHead>
-                            <TableHead>Result</TableHead>
-                            <TableHead>Auto</TableHead>
-                            <TableHead>Teleop</TableHead>
-                            <TableHead>Endgame</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {teamMatches.map((match, index) => {
-                            const teamDataMatch = match.teams?.find(t => t.teamNumber === currentTeamNumber)
-                            const isRedAlliance = teamDataMatch?.station.startsWith('Red')
-                            const allianceScore = isRedAlliance ? match.scoreRedFinal : match.scoreBlueFinal
-                            const opponentScore = isRedAlliance ? match.scoreBlueFinal : match.scoreRedFinal
-                            const won = allianceScore !== null && opponentScore !== null && allianceScore > opponentScore
-                            const tied = allianceScore !== null && opponentScore !== null && allianceScore === opponentScore
-                            const autoScore = isRedAlliance ? match.scoreRedAuto : match.scoreBlueAuto
-                            const teleopScore = isRedAlliance ? match.scoreRedTeleop : match.scoreBlueTeleop
-                            const endgameScore = isRedAlliance ? match.scoreRedEndgame : match.scoreBlueEndgame
-
-                            return (
-                              <TableRow key={`${match.eventCode}-${match.tournamentLevel}-${match.matchNumber}-${index}`}>
-                                <TableCell className="text-sm">
-                                  {new Date(match.actualStartTime || match.startTime).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric'
-                                  })}
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium text-sm">{match.eventName}</div>
-                                    <div className="text-xs text-muted-foreground">{match.eventCity}, {match.eventState}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{match.tournamentLevel === 'qual' ? 'Qual' : 'Playoff'} {match.matchNumber}</div>
-                                    {teamDataMatch && <div className="text-xs text-muted-foreground">{teamDataMatch.station}</div>}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant={isRedAlliance ? 'destructive' : 'default'}
-                                    className={isRedAlliance ? 'text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}
-                                  >
-                                    {isRedAlliance ? 'Red' : 'Blue'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="font-bold">
-                                  {allianceScore !== null ? allianceScore : '-'}
-                                  <span className="text-muted-foreground"> - </span>
-                                  {opponentScore !== null ? opponentScore : '-'}
-                                </TableCell>
-                                <TableCell>
-                                  {allianceScore !== null && opponentScore !== null ? (
-                                    <Badge variant={won ? 'default' : tied ? 'secondary' : 'outline'}>
-                                      {won ? 'Win' : tied ? 'Tie' : 'Loss'}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground text-sm">-</span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-sm">{autoScore ?? '-'}</TableCell>
-                                <TableCell className="text-sm">{teleopScore ?? '-'}</TableCell>
-                                <TableCell className="text-sm">{endgameScore ?? '-'}</TableCell>
-                              </TableRow>
-                            )
-                          })}
-                        </TableBody>
-                      </Table>
-                    </TabsContent>
-                  </Tabs>
+                  <TeamPerformanceTabs
+                    matches={teamMatches}
+                    awards={teamAwards}
+                    teamNumber={currentTeamNumber}
+                    season={selectedSeason}
+                  />
                 </CardContent>
               </Card>
+              </div>
             )
           })()}
 
           {/* Events Card - shown independently for current season */}
-          {isCurrentSeason && teamEvents.length > 0 && (() => {
-            const now = new Date()
-            const upcomingEvents = teamEvents.filter((event: TeamEvent) => new Date(event.dateEnd) >= now)
-            const pastEvents = teamEvents.filter((event: TeamEvent) => new Date(event.dateEnd) < now)
-
-            // Only show the events card if there are any events to display
-            if (upcomingEvents.length === 0 && pastEvents.length === 0) {
-              return null
-            }
-
-            const formatDate = (dateString: string) => {
-              return new Date(dateString).toLocaleDateString('en-US', {
-                weekday: 'short',
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-              })
-            }
-
-            const getEventTypeLabel = (eventType: string) => {
-              const typeNum = parseInt(eventType)
-              switch (typeNum) {
-                case 0: return 'Regional'
-                case 1: return 'Super Regional'
-                case 2: return 'Championship'
-                case 3: return 'League Meet'
-                case 4: return 'League Tournament'
-                case 5: return 'Qualifier'
-                case 6: return 'Other'
-                default: return 'Unknown'
-              }
-            }
-
-            const getEventTypeBadgeVariant = (eventType: string) => {
-              const typeNum = parseInt(eventType)
-              switch (typeNum) {
-                case 2: return 'default' // Championship
-                case 1: return 'secondary' // Super Regional
-                case 0: return 'outline' // Regional
-                default: return 'outline'
-              }
-            }
-
-            const handleEventClick = (eventCode: string) => {
-              const params = new URLSearchParams()
-              params.set('season', selectedSeason.toString())
-              router.push(`/scouting/events/${eventCode}?${params.toString()}`)
-            }
-
-            return (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-2xl font-bold">Events</CardTitle>
-                  <CardDescription>
-                    Upcoming and past events for the {selectedSeason} season
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Upcoming Events */}
-                    {upcomingEvents.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3">UPCOMING EVENTS</h3>
-                        <div className="space-y-4">
-                          {upcomingEvents.map((event: TeamEvent) => (
-                            <Card
-                              key={event.code}
-                              className="border-l-4 border-l-blue-500 transition-all hover:shadow-md cursor-pointer"
-                              onClick={() => handleEventClick(event.code)}
-                            >
-                              <CardContent className="p-6">
-                                <div className="flex items-start justify-between">
-                                  <div className="space-y-2 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <h4 className="font-semibold text-lg">{event.name}</h4>
-                                      <Badge variant={getEventTypeBadgeVariant(event.type)}>
-                                        {getEventTypeLabel(event.type)}
-                                      </Badge>
-                                    </div>
-                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                      <div className="flex items-center gap-1">
-                                        <Calendar className="h-4 w-4" />
-                                        <span>
-                                          {formatDate(event.dateStart)}
-                                          {event.dateStart !== event.dateEnd && (
-                                            <> - {formatDate(event.dateEnd)}</>
-                                          )}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <MapPin className="h-4 w-4" />
-                                        <span>
-                                          {event.venue && `${event.venue}, `}
-                                          {event.city}, {event.stateprov}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Past Events */}
-                    {pastEvents.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3">PAST EVENTS</h3>
-                        <div className="space-y-4">
-                          {pastEvents.map((event: TeamEvent) => (
-                            <Card
-                              key={event.code}
-                              className="border-l-4 border-l-gray-300 transition-all hover:shadow-md cursor-pointer opacity-75"
-                              onClick={() => handleEventClick(event.code)}
-                            >
-                              <CardContent className="p-6">
-                                <div className="flex items-start justify-between">
-                                  <div className="space-y-2 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <h4 className="font-semibold text-lg">{event.name}</h4>
-                                      <Badge variant={getEventTypeBadgeVariant(event.type)}>
-                                        {getEventTypeLabel(event.type)}
-                                      </Badge>
-                                    </div>
-                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                      <div className="flex items-center gap-1">
-                                        <Calendar className="h-4 w-4" />
-                                        <span>
-                                          {formatDate(event.dateStart)}
-                                          {event.dateStart !== event.dateEnd && (
-                                            <> - {formatDate(event.dateEnd)}</>
-                                          )}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <MapPin className="h-4 w-4" />
-                                        <span>
-                                          {event.venue && `${event.venue}, `}
-                                          {event.city}, {event.stateprov}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })()}
+          {isCurrentSeason && teamEvents.length > 0 && (
+            <TeamEventsCard
+              events={teamEvents}
+              season={selectedSeason}
+              onEventClick={(eventCode) => {
+                const params = new URLSearchParams()
+                params.set('season', selectedSeason.toString())
+                router.push(`/scouting/events/${eventCode}?${params.toString()}`)
+              }}
+            />
+          )}
         </div>
 
         {/* Scouting Notes Sidebar */}
@@ -1176,6 +837,17 @@ function ScoutingTeamsPageContent() {
             teamNumber={currentTeamNumber}
             teamName={teamInfo.nameShort || teamInfo.nameFull}
             onClose={() => setShowNotesSidebar(false)}
+          />
+        )}
+
+        {/* Fill Scouting Sheet Drawer */}
+        {showFillScoutingSheet && teamInfo && (
+          <FillScoutingSheet
+            isOpen={showFillScoutingSheet}
+            onClose={() => setShowFillScoutingSheet(false)}
+            teamNumber={currentTeamNumber}
+            teamName={teamInfo.nameShort || teamInfo.nameFull}
+            season={selectedSeason}
           />
         )}
       </DashboardLayout>

@@ -42,6 +42,7 @@ interface DashboardLayoutProps {
   pageTitle?: string
   pageIcon?: React.ComponentType<{ size?: number; className?: string }>
   actions?: React.ReactNode
+  leftActions?: React.ReactNode
   disableContentScroll?: boolean
 }
 
@@ -64,12 +65,14 @@ function DashboardLayoutContent({
   pageTitle,
   PageIcon,
   actions,
+  leftActions,
   disableContentScroll,
 }: {
   children: React.ReactNode
   pageTitle: string
   PageIcon: React.ComponentType<{ size?: number; className?: string }>
   actions?: React.ReactNode
+  leftActions?: React.ReactNode
   disableContentScroll: boolean
 }) {
   const pathname = usePathname()
@@ -227,6 +230,13 @@ function DashboardLayoutContent({
           <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
             {shouldShowToggle && <SidebarTrigger className="-ml-1" />}
             <div className="flex flex-1 items-center gap-4">
+              {/* Left Actions (e.g., back button) */}
+              {leftActions && (
+                <div className="flex items-center">
+                  {leftActions}
+                </div>
+              )}
+
               {/* Page Title with Icon */}
               <div className="flex items-center gap-2">
                 <PageIcon size={20} className="text-foreground" />
@@ -263,6 +273,7 @@ export function DashboardLayout({
   pageTitle = "Dashboard",
   pageIcon: PageIcon = Home,
   actions,
+  leftActions,
   disableContentScroll = false
 }: DashboardLayoutProps) {
   const [open, setOpen] = useState(true)
@@ -290,6 +301,7 @@ export function DashboardLayout({
         pageTitle={pageTitle}
         PageIcon={PageIcon}
         actions={actions}
+        leftActions={leftActions}
         disableContentScroll={disableContentScroll}
       >
         {children}

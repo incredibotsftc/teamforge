@@ -76,7 +76,7 @@ export function ScoutingTeamNotes({ teamNumber, teamName, onClose }: ScoutingTea
             setHasTemplate(true)
             setTemplatePageId(templatePages.id)
           }
-        } catch (err) {
+        } catch {
           // Not a valid template JSON
         }
       }
@@ -142,7 +142,7 @@ export function ScoutingTeamNotes({ teamNumber, teamName, onClose }: ScoutingTea
 
   const handleViewScoutingSheet = () => {
     if (templatePageId) {
-      window.open(`/scouting/sheet/print?pageId=${templatePageId}`, '_blank')
+      window.open(`/scouting/template/print?pageId=${templatePageId}`, '_blank')
     }
   }
 

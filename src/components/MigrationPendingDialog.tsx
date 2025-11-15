@@ -153,7 +153,7 @@ export function MigrationPendingDialog({
             </TabsList>
 
             <TabsContent value="release-notes" className="space-y-4 mt-4">
-              {pendingReleaseNotes.map((release) => (
+              {[...pendingReleaseNotes].reverse().map((release) => (
                 <div key={release.version} className="border rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-4">
                     <Badge>{release.version}</Badge>

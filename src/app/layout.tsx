@@ -8,6 +8,7 @@ import { AccentColorProvider } from "@/components/AccentColorProvider";
 import { QueryProvider } from "@/components/QueryProvider";
 import { VersionChecker } from "@/components/VersionChecker";
 import { SupabaseErrorBoundary } from "@/components/SupabaseErrorBoundary";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -84,6 +85,7 @@ export default function RootLayout({
                   <ThemeProvider>
                     <AccentColorProvider>
                       {children}
+                      <Toaster />
                     </AccentColorProvider>
                   </ThemeProvider>
                 </AppDataProvider>

@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Calendar, MapPin, Users, Loader2, AlertCircle, ExternalLink } from 'lucide-react'
+import { Calendar, MapPin, Users, Loader2, AlertCircle, ExternalLink, FileText } from 'lucide-react'
 import { ScoutingSearchBar } from '@/components/scouting/ScoutingSearchBar'
+import { EventScoutingSheets } from '@/components/scouting/EventScoutingSheets'
 
 interface FTCEvent {
   key: string
@@ -66,6 +67,9 @@ function EventDetailsPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [event, setEvent] = useState<FTCEvent | null>(null)
   const [teams, setTeams] = useState<TeamInfo[]>([])
+  const [showScoutingSheets, setShowScoutingSheets] = useState(false)
+  const [selectedTeamNumber, setSelectedTeamNumber] = useState<number | null>(null)
+  const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null)
 
   // Generate available seasons
   const currentYear = currentSeason?.start_year || 2025
@@ -240,17 +244,17 @@ function EventDetailsPageContent() {
         <div className="space-y-6">
           {/* Event Information Card */}
           <Card className="border-l-4 border-l-blue-500">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-2xl font-semibold">{event.name}</h3>
+                  <div className="flex flex-col md:flex-row md:items-center gap-2">
+                    <h3 className="text-xl md:text-2xl font-semibold">{event.name}</h3>
                     <Badge variant={getEventTypeBadgeVariant(event.event_type)}>
                       {getEventTypeLabel(event.event_type)}
                     </Badge>
                   </div>
 
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
                       <span>
@@ -263,7 +267,7 @@ function EventDetailsPageContent() {
 
                     <div className="flex items-center gap-1">
                       <MapPin className="h-4 w-4" />
-                      <span>
+                      <span className="break-words">
                         {event.venue && `${event.venue}, `}
                         {event.city}, {event.state_prov}
                       </span>
@@ -275,9 +279,17 @@ function EventDetailsPageContent() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 ml-4">
+                <div className="flex flex-col sm:flex-row gap-2 md:ml-4">
+                  <Button
+                    size="sm"
+                    onClick={() => setShowScoutingSheets(true)}
+                    className="w-full sm:w-auto btn-accent"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    View Scouting Sheets
+                  </Button>
                   {event.website && (
-                    <Button variant="outline" size="sm" asChild>
+                    <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
                       <a
                         href={event.website}
                         target="_blank"
@@ -330,7 +342,8 @@ function EventDetailsPageContent() {
                         <TableHead className="text-center">W-L-T</TableHead>
                         <TableHead className="text-right">RP</TableHead>
                         <TableHead className="text-right">TBP</TableHead>
-                        <TableHead className="w-20"></TableHead>
+                        <TableHead className="w-12"></TableHead>
+                        <TableHead className="w-12 hidden md:table-cell"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -397,6 +410,20 @@ function EventDetailsPageContent() {
                             {team.sortOrder2 !== null ? team.sortOrder2.toFixed(1) : '-'}
                           </TableCell>
                           <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedTeamNumber(team.teamNumber)
+                                setSelectedTeamName(team.nameShort || team.nameFull || '')
+                                setShowScoutingSheets(true)
+                              }}
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
                             {team.website && (
                               <Button variant="ghost" size="sm" asChild>
                                 <a
@@ -419,6 +446,24 @@ function EventDetailsPageContent() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Scouting Sheets Dialog */}
+        <EventScoutingSheets
+          eventCode={eventCode}
+          eventName={event.name}
+          seasonId={currentSeason?.id}
+          teamNumber={selectedTeamNumber}
+          teamName={selectedTeamName}
+          eventTeams={teams}
+          open={showScoutingSheets}
+          onOpenChange={(open) => {
+            setShowScoutingSheets(open)
+            if (!open) {
+              setSelectedTeamNumber(null)
+              setSelectedTeamName(null)
+            }
+          }}
+        />
       </DashboardLayout>
     </ProtectedRoute>
   )

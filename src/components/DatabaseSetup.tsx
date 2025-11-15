@@ -185,9 +185,8 @@ export function DatabaseSetup({ onSetupComplete }: DatabaseSetupProps) {
                   <p className="font-medium">Setup Process</p>
                   <p className="mt-1 text-xs">Copy the SQL below and run it in your Supabase dashboard:</p>
                   <ol className="list-decimal list-inside mt-1.5 space-y-0.5 text-xs ml-2">
-                    <li>Copy the SQL script below</li>
-                    <li>Click &quot;Open Supabase&quot; to open your dashboard</li>
-                    <li>Navigate to the SQL Editor</li>
+                    <li>Click &quot;Copy SQL&quot; to copy the script</li>
+                    <li>Open your Supabase dashboard and navigate to the SQL Editor</li>
                     <li>Paste and execute the SQL script</li>
                     <li>Return here and click &quot;I&apos;ve Run the SQL - Continue&quot;</li>
                   </ol>
@@ -228,10 +227,20 @@ export function DatabaseSetup({ onSetupComplete }: DatabaseSetupProps) {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => window.open('https://app.supabase.com', '_blank')}
+                onClick={handleCopySQL}
+                disabled={!migrationSQL}
               >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Open Supabase
+                {copied ? (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy SQL
+                  </>
+                )}
               </Button>
               <Button
                 className="flex-1"

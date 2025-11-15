@@ -209,13 +209,12 @@ function ScoutingPageContent() {
       />
 
       <Button
-        variant="outline"
         size="sm"
-        onClick={() => router.push('/scouting/sheet')}
-        className="whitespace-nowrap"
+        onClick={() => router.push('/scouting/template')}
+        className="whitespace-nowrap btn-accent"
       >
         <FileText className="mr-2 h-4 w-4" />
-        Scouting Sheet
+        Scouting Template
       </Button>
     </div>
   )

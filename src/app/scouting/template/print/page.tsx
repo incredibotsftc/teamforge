@@ -1,17 +1,17 @@
 "use client"
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChevronLeft, Printer } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { ChevronLeft, Printer, Loader2 } from 'lucide-react'
 import { useAppData } from '@/components/AppDataProvider'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { useSearchParams } from 'next/navigation'
 
-type QuestionType = 'text' | 'number' | 'multiple-choice' | 'checkbox' | 'scale' | 'long-text'
+type QuestionType = 'text' | 'number' | 'multiple-choice' | 'checkbox' | 'scale' | 'long-text' | 'image' | 'field'
 
 interface Question {
   id: string
@@ -22,7 +22,7 @@ interface Question {
   scaleMax?: number
 }
 
-export default function ScoutingSheetPrint() {
+function ScoutingSheetPrintContent() {
   const router = useRouter()
   const { team } = useAppData()
   const searchParams = useSearchParams()
@@ -34,7 +34,7 @@ export default function ScoutingSheetPrint() {
   const [templateName, setTemplateName] = useState<string>('')
   const [questions, setQuestions] = useState<Question[]>([])
   const [fillingTeamNumber, setFillingTeamNumber] = useState<string>(team?.team_number ? String(team.team_number) : '')
-  const [responses, setResponses] = useState<Record<string, any>>({})
+  const [responses, setResponses] = useState<Record<string, string | number | string[]>>({})
   const [savedMessage, setSavedMessage] = useState<string | null>(null)
   const [eventCode, setEventCode] = useState<string>('')
   const { user } = useAuth()
@@ -54,7 +54,7 @@ export default function ScoutingSheetPrint() {
           const key = responsesKeyFor(fillingTeamNumber)
           const rawResp = localStorage.getItem(key)
           if (rawResp) setResponses(JSON.parse(rawResp))
-        } catch (err) {
+        } catch {
           // ignore
         }
         return
@@ -82,7 +82,7 @@ export default function ScoutingSheetPrint() {
                   const key = responsesKeyFor(fillingTeamNumber)
                   const rawResp = localStorage.getItem(key)
                   if (rawResp) setResponses(JSON.parse(rawResp))
-                } catch (err) {
+                } catch {
                   // ignore
                 }
                 return
@@ -107,7 +107,7 @@ export default function ScoutingSheetPrint() {
             const key = responsesKeyFor(fillingTeamNumber)
             const rawResp = localStorage.getItem(key)
             if (rawResp) setResponses(JSON.parse(rawResp))
-          } catch (err) {
+          } catch {
             // ignore
           }
           return
@@ -121,6 +121,7 @@ export default function ScoutingSheetPrint() {
     } catch (err) {
       console.error('Failed to load print preview data', err)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [printPreviewKey, templatesKey, storageKey])
 
   // Load saved response + template from DB when eventCode and fillingTeamNumber change
@@ -172,27 +173,18 @@ export default function ScoutingSheetPrint() {
     window.print()
   }
 
-  const setResponse = (questionId: string, value: any) => {
+  const setResponse = (questionId: string, value: string | number | string[]) => {
     setResponses(prev => {
       const next = { ...prev, [questionId]: value }
       try {
         if (fillingTeamNumber) {
           localStorage.setItem(responsesKeyFor(fillingTeamNumber), JSON.stringify(next))
         }
-      } catch (err) {
+      } catch {
         // ignore
       }
       return next
     })
-  }
-
-  const saveResponses = () => {
-    if (!fillingTeamNumber) return
-    try {
-      localStorage.setItem(responsesKeyFor(fillingTeamNumber), JSON.stringify(responses))
-    } catch (err) {
-      console.error('Failed to save responses', err)
-    }
   }
 
   const saveResponsesToDb = async () => {
@@ -220,11 +212,11 @@ export default function ScoutingSheetPrint() {
 
       console.log('[Save] eventCode state:', eventCode, '| trimmed:', eventCode.trim())
       
-      const payload: any = {
-        template_id: null,
+      const payload = {
+        template_id: null as string | null,
         scouted_team_number: fillingTeamNumber ? Number(fillingTeamNumber) : null,
         event_code: eventCode.trim(),
-        match_number: null,
+        match_number: null as number | null,
         practice_match: false,
         responses: responses,
         notes: null,
@@ -243,7 +235,7 @@ export default function ScoutingSheetPrint() {
         // Try to show useful details
         try {
           console.error('Failed to save responses to DB', JSON.stringify(res.error, null, 2))
-        } catch (e) {
+        } catch {
           console.error('Failed to save responses to DB', res.error)
         }
         setSavedMessage('Failed to save to DB: ' + (res.error.message || 'unknown'))
@@ -284,7 +276,7 @@ export default function ScoutingSheetPrint() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => router.push('/scouting/sheet')}>
+            <Button variant="ghost" size="sm" onClick={() => router.push('/scouting/template')}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <h1 className="text-xl font-semibold">{templateName || 'Scouting Sheet'}</h1>
@@ -351,8 +343,8 @@ export default function ScoutingSheetPrint() {
                         <div className="space-y-2">
                           {q.options.filter(o => o).map((opt, i) => (
                             <label key={i} className="flex items-center gap-2">
-                              <input type="checkbox" checked={Array.isArray(responses[q.id]) ? responses[q.id].includes(opt) : false} onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                const prev = Array.isArray(responses[q.id]) ? responses[q.id] : []
+                              <input type="checkbox" checked={Array.isArray(responses[q.id]) ? (responses[q.id] as string[]).includes(opt) : false} onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const prev = Array.isArray(responses[q.id]) ? (responses[q.id] as string[]) : []
                                 if (e.target.checked) setResponse(q.id, [...prev, opt])
                                 else setResponse(q.id, prev.filter((x: string) => x !== opt))
                               }} />
@@ -371,8 +363,19 @@ export default function ScoutingSheetPrint() {
                           ))}
                         </div>
                       )}
+                      {type === 'image' && (
+                        <div className="border-2 border-dashed rounded p-4 text-center text-sm text-muted-foreground">
+                          Image upload area
+                        </div>
+                      )}
+                      {type === 'field' && (
+                        <div className="border rounded overflow-hidden max-w-md">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src="/field.png" alt="Field diagram" className="w-full h-auto" />
+                        </div>
+                      )}
                       {/* Fallback empty area if no specific control */}
-                      {!['text','number','long-text','multiple-choice','checkbox','scale'].includes(type) && (
+                      {!['text','number','long-text','multiple-choice','checkbox','scale','image','field'].includes(type) && (
                         <div style={{minHeight: '4rem'}} />
                       )}
                     </div>
@@ -393,5 +396,26 @@ export default function ScoutingSheetPrint() {
         `}</style>
       </div>
     </div>
+  )
+}
+
+export default function ScoutingSheetPrint() {
+  return (
+    <Suspense fallback={
+      <div className="p-6">
+        <div className="max-w-4xl mx-auto">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin mr-2" />
+                <span>Loading scouting sheet...</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    }>
+      <ScoutingSheetPrintContent />
+    </Suspense>
   )
 }

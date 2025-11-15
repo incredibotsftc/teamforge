@@ -217,6 +217,23 @@ export const ftcEventsService = {
   },
 
   /**
+   * Search for events by event name (partial match supported, min 2 chars)
+   */
+  async searchEventsByName(season: number, eventName: string): Promise<FTCEvent[]> {
+    if (eventName.length < 2) {
+      throw new Error('Event name must be at least 2 characters')
+    }
+
+    // Get all events for the season and filter by event name
+    const allEvents = await this.getEventsForSeason(season)
+    const searchTerm = eventName.toLowerCase()
+
+    return allEvents.filter(event =>
+      event.name.toLowerCase().includes(searchTerm)
+    )
+  },
+
+  /**
    * Get upcoming events (events that haven't ended yet)
    */
   async getUpcomingEvents(): Promise<FTCEvent[]> {
