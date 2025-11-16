@@ -73,10 +73,52 @@ export interface UpdateFolderData {
   sort_order?: number
 }
 
+export interface NotebookSheet {
+  id: string
+  team_id: string
+  season_id: string
+  folder_id?: string
+  title: string
+  sheet_data_path?: string // Path to Univer workbook JSON in storage
+  sheet_data_size?: number // Size of sheet data file in bytes
+  column_count?: number // Number of columns for quick metadata
+  row_count?: number // Number of rows for quick metadata
+  is_pinned: boolean
+  sort_order: number
+  linked_entity_type?: LinkedEntityType
+  linked_entity_id?: string
+  created_at: string
+  updated_at: string
+  created_by: string
+  updated_by: string
+}
+
+export interface CreateSheetData {
+  title: string
+  folder_id?: string
+  linked_entity_type?: LinkedEntityType
+  linked_entity_id?: string
+}
+
+export interface UpdateSheetData {
+  title?: string
+  sheet_data_path?: string
+  sheet_data_size?: number
+  column_count?: number
+  row_count?: number
+  folder_id?: string
+  is_pinned?: boolean
+  sort_order?: number
+  linked_entity_type?: LinkedEntityType
+  linked_entity_id?: string
+}
+
 export interface NotebookState {
   folders: NotebookFolder[]
   pages: NotebookPage[]
+  sheets: NotebookSheet[]
   currentPage?: NotebookPage
+  currentSheet?: NotebookSheet
   currentFolder?: NotebookFolder
   isLoading: boolean
   error?: string

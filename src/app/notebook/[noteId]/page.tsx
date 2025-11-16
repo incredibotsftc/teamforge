@@ -49,18 +49,25 @@ export default function NotePage() {
   const {
     folders,
     pages,
+    sheets,
     currentPage,
+    currentSheet,
     currentFolder,
     isLoading,
     error,
     createFolder,
     createPage,
+    createSheet,
     updatePage,
+    updateSheet,
     updateFolder,
     deletePage,
+    deleteSheet,
     deleteFolder,
     movePageToFolder,
+    moveSheetToFolder,
     setCurrentPage,
+    setCurrentSheet,
     setCurrentFolder
   } = useNotebookContext()
 
@@ -155,18 +162,49 @@ export default function NotePage() {
   const handleSelectFolder = useCallback((folder?: NotebookFolder) => {
     setCurrentFolder(folder)
     setCurrentPage(undefined)
+    setCurrentSheet(undefined)
     // Navigate to notebook home when selecting a folder
     if (folder) {
       router.push(`/notebook?folder=${folder.id}`)
     } else {
       router.push('/notebook')
     }
-  }, [setCurrentFolder, setCurrentPage, router])
+  }, [setCurrentFolder, setCurrentPage, setCurrentSheet, router])
+
+  // Sheet handlers
+  const handleCreateSheet = useCallback(async (data: { title: string; folder_id?: string }) => {
+    const newSheet = await createSheet(data)
+    if (newSheet) {
+      setCurrentSheet(newSheet)
+      router.push(`/notebook/sheet/${newSheet.id}`)
+    }
+  }, [createSheet, setCurrentSheet, router])
+
+  const handleSelectSheet = useCallback((sheet: import('@/types/notebook').NotebookSheet) => {
+    router.push(`/notebook/sheet/${sheet.id}`)
+  }, [router])
+
+  const handleDeleteSheet = useCallback(async (id: string) => {
+    await deleteSheet(id)
+  }, [deleteSheet])
+
+  const handleMoveSheetToFolder = useCallback(async (sheetId: string, folderId?: string) => {
+    await moveSheetToFolder(sheetId, folderId)
+  }, [moveSheetToFolder])
+
+  const handleUpdateSheetMetadata = useCallback(async (id: string, data: { title?: string; is_pinned?: boolean }) => {
+    await updateSheet(id, data, true)
+  }, [updateSheet])
 
   const handleMobileSelectPage = useCallback((page: NotebookPage) => {
     handleSelectPage(page)
     setIsMobileSidebarOpen(false)
   }, [handleSelectPage])
+
+  const handleMobileSelectSheet = useCallback((sheet: import('@/types/notebook').NotebookSheet) => {
+    handleSelectSheet(sheet)
+    setIsMobileSidebarOpen(false)
+  }, [handleSelectSheet])
 
   const handlePanelResize = useCallback((sizes: number[]) => {
     const newSize = sizes[0]
@@ -298,16 +336,23 @@ export default function NotePage() {
               <NotebookSidebar
                 folders={folders}
                 pages={pages}
+                sheets={sheets}
                 currentPage={currentPage}
+                currentSheet={currentSheet}
                 currentFolder={currentFolder}
                 onCreatePage={handleCreatePage}
+                onCreateSheet={handleCreateSheet}
                 onSelectPage={handleMobileSelectPage}
+                onSelectSheet={handleMobileSelectSheet}
                 onSelectFolder={handleSelectFolder}
                 onDeletePage={handleDeletePage}
+                onDeleteSheet={handleDeleteSheet}
                 onDeleteFolder={handleDeleteFolder}
                 onUpdatePage={handleUpdatePageMetadata}
+                onUpdateSheet={handleUpdateSheetMetadata}
                 onUpdateFolder={handleUpdateFolder}
                 onMovePageToFolder={handleMovePageToFolder}
+                onMoveSheetToFolder={handleMoveSheetToFolder}
               />
             </div>
           </>
@@ -325,16 +370,23 @@ export default function NotePage() {
               <NotebookSidebar
                 folders={folders}
                 pages={pages}
+                sheets={sheets}
                 currentPage={currentPage}
+                currentSheet={currentSheet}
                 currentFolder={currentFolder}
                 onCreatePage={handleCreatePage}
+                onCreateSheet={handleCreateSheet}
                 onSelectPage={handleSelectPage}
+                onSelectSheet={handleSelectSheet}
                 onSelectFolder={handleSelectFolder}
                 onDeletePage={handleDeletePage}
+                onDeleteSheet={handleDeleteSheet}
                 onDeleteFolder={handleDeleteFolder}
                 onUpdatePage={handleUpdatePageMetadata}
+                onUpdateSheet={handleUpdateSheetMetadata}
                 onUpdateFolder={handleUpdateFolder}
                 onMovePageToFolder={handleMovePageToFolder}
+                onMoveSheetToFolder={handleMoveSheetToFolder}
               />
             </ResizablePanel>
             <ResizableHandle withHandle />

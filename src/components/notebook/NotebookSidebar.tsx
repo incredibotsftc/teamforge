@@ -21,12 +21,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
-import { NotebookFolder, NotebookPage } from '@/types/notebook'
+import { NotebookFolder, NotebookPage, NotebookSheet } from '@/types/notebook'
 import { FolderDialog } from './FolderDialog'
 import {
   Search,
-  Plus,
   FileText,
+  Table,
   MoreHorizontal,
   Edit,
   Trash2,
@@ -41,31 +41,45 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 interface NotebookSidebarProps {
   folders: NotebookFolder[]
   pages: NotebookPage[]
+  sheets: NotebookSheet[]
   currentPage?: NotebookPage
+  currentSheet?: NotebookSheet
   currentFolder?: NotebookFolder
   onCreatePage: (data: { title: string; folder_id?: string }) => Promise<void>
+  onCreateSheet: (data: { title: string; folder_id?: string }) => Promise<void>
   onSelectPage: (page: NotebookPage) => void
+  onSelectSheet: (sheet: NotebookSheet) => void
   onSelectFolder: (folder?: NotebookFolder) => void
   onDeletePage: (id: string) => Promise<void>
+  onDeleteSheet: (id: string) => Promise<void>
   onDeleteFolder: (id: string) => Promise<void>
   onUpdatePage: (id: string, data: { title?: string; is_pinned?: boolean }) => Promise<void>
+  onUpdateSheet: (id: string, data: { title?: string; is_pinned?: boolean }) => Promise<void>
   onUpdateFolder: (id: string, data: { name?: string; parent_folder_id?: string | null; color?: string }) => Promise<void>
   onMovePageToFolder: (pageId: string, folderId?: string) => Promise<void>
+  onMoveSheetToFolder: (sheetId: string, folderId?: string) => Promise<void>
 }
 
 export function NotebookSidebar({
   folders,
   pages,
+  sheets,
   currentPage,
+  currentSheet,
   currentFolder,
   onCreatePage,
+  onCreateSheet,
   onSelectPage,
+  onSelectSheet,
   onSelectFolder,
   onDeletePage,
+  onDeleteSheet,
   onDeleteFolder,
   onUpdatePage,
+  onUpdateSheet,
   onUpdateFolder,
   onMovePageToFolder,
+  onMoveSheetToFolder,
 }: NotebookSidebarProps) {
   // Helper function to get all folder IDs recursively
   const getAllFolderIds = useCallback((folders: NotebookFolder[]): string[] => {
@@ -82,9 +96,11 @@ export function NotebookSidebar({
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [editingPageId, setEditingPageId] = useState<string | null>(null)
+  const [editingSheetId, setEditingSheetId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'page' | 'folder'; id: string; name: string } | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'page' | 'sheet' | 'folder'; id: string; name: string } | null>(null)
   const [draggedPage, setDraggedPage] = useState<NotebookPage | null>(null)
+  const [draggedSheet, setDraggedSheet] = useState<NotebookSheet | null>(null)
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
   const [editingFolder, setEditingFolder] = useState<NotebookFolder | null>(null)
   const [showFolderDialog, setShowFolderDialog] = useState(false)
@@ -101,8 +117,16 @@ export function NotebookSidebar({
     page.content_text.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Filter sheets based on search
+  const filteredSheets = sheets.filter(sheet =>
+    sheet.title.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   // Get pages without folders (root level)
   const rootPages = pages.filter(page => !page.folder_id)
+
+  // Get sheets without folders (root level)
+  const rootSheets = sheets.filter(sheet => !sheet.folder_id)
 
   // Toggle folder expansion
   const toggleFolder = (folderId: string) => {
@@ -121,6 +145,12 @@ export function NotebookSidebar({
     setEditingTitle(page.title)
   }
 
+  // Start editing sheet title
+  const startEditingSheet = (sheet: NotebookSheet) => {
+    setEditingSheetId(sheet.id)
+    setEditingTitle(sheet.title)
+  }
+
   // Save page title edit
   const savePageTitle = async () => {
     if (editingPageId && editingTitle.trim()) {
@@ -130,9 +160,24 @@ export function NotebookSidebar({
     setEditingTitle('')
   }
 
+  // Save sheet title edit
+  const saveSheetTitle = async () => {
+    if (editingSheetId && editingTitle.trim()) {
+      await onUpdateSheet(editingSheetId, { title: editingTitle.trim() })
+    }
+    setEditingSheetId(null)
+    setEditingTitle('')
+  }
+
   // Cancel page title edit
   const cancelEditingPage = () => {
     setEditingPageId(null)
+    setEditingTitle('')
+  }
+
+  // Cancel sheet title edit
+  const cancelEditingSheet = () => {
+    setEditingSheetId(null)
     setEditingTitle('')
   }
 
@@ -142,21 +187,31 @@ export function NotebookSidebar({
 
     if (deleteConfirm.type === 'page') {
       await onDeletePage(deleteConfirm.id)
+    } else if (deleteConfirm.type === 'sheet') {
+      await onDeleteSheet(deleteConfirm.id)
     } else {
       await onDeleteFolder(deleteConfirm.id)
     }
     setDeleteConfirm(null)
   }
 
-  // Drag and drop handlers
+  // Drag and drop handlers for pages
   const handleDragStart = (e: React.DragEvent, page: NotebookPage) => {
     setDraggedPage(page)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', page.id)
   }
 
+  // Drag and drop handlers for sheets
+  const handleSheetDragStart = (e: React.DragEvent, sheet: NotebookSheet) => {
+    setDraggedSheet(sheet)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', sheet.id)
+  }
+
   const handleDragEnd = () => {
     setDraggedPage(null)
+    setDraggedSheet(null)
     setDragOverFolder(null)
   }
 
@@ -179,14 +234,18 @@ export function NotebookSidebar({
 
   const handleDrop = async (e: React.DragEvent, folderId?: string) => {
     e.preventDefault()
-    if (!draggedPage) return
 
     try {
-      await onMovePageToFolder(draggedPage.id, folderId)
+      if (draggedPage) {
+        await onMovePageToFolder(draggedPage.id, folderId)
+      } else if (draggedSheet) {
+        await onMoveSheetToFolder(draggedSheet.id, folderId)
+      }
     } catch (error) {
-      console.error('Error moving page:', error)
+      console.error('Error moving item:', error)
     } finally {
       setDraggedPage(null)
+      setDraggedSheet(null)
       setDragOverFolder(null)
     }
   }
@@ -266,8 +325,15 @@ export function NotebookSidebar({
                 e.stopPropagation()
                 onCreatePage({ title: 'Untitled', folder_id: folder.id })
               }}>
-                <Plus className="w-4 h-4 mr-2" />
+                <FileText className="w-4 h-4 mr-2" />
                 New Note
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation()
+                onCreateSheet({ title: 'Untitled Sheet', folder_id: folder.id })
+              }}>
+                <Table className="w-4 h-4 mr-2" />
+                New Sheet
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={(e) => {
@@ -361,6 +427,75 @@ export function NotebookSidebar({
           </div>
         ))}
 
+        {/* Folder sheets */}
+        {isExpanded && sheets.filter(s => s.folder_id === folder.id).map(sheet => (
+          <div
+            key={sheet.id}
+            className={`flex items-center gap-1 md:gap-2 pr-2 py-2 md:py-1.5 rounded-md text-sm cursor-pointer hover:bg-accent group min-h-[44px] md:min-h-auto ${
+              currentSheet?.id === sheet.id ? 'bg-accent' : ''
+            } ${draggedSheet?.id === sheet.id ? 'opacity-50' : ''}`}
+            style={{ paddingLeft: `${level * 8 + 28}px`, paddingRight: '8px' }}
+            onClick={() => onSelectSheet(sheet)}
+            draggable={true}
+            onDragStart={(e) => handleSheetDragStart(e, sheet)}
+            onDragEnd={handleDragEnd}
+          >
+            <GripVertical className="w-3 h-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 flex-shrink-0 cursor-grab" />
+            <Table className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+
+            {editingSheetId === sheet.id ? (
+              <Input
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onBlur={saveSheetTitle}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveSheetTitle()
+                  if (e.key === 'Escape') cancelEditingSheet()
+                }}
+                className="h-6 text-sm flex-1"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex-1 truncate">{sheet.title}</span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {sheet.title}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="w-3 h-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => startEditingSheet(sheet)}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setDeleteConfirm({ type: 'sheet', id: sheet.id, name: sheet.title })}
+                  className="text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ))}
+
         {/* Subfolders */}
         {isExpanded && folder.children && folder.children.map(subfolder => (
           renderFolder(subfolder, level + 1)
@@ -395,7 +530,7 @@ export function NotebookSidebar({
           /* Search Results */
           <div className="space-y-1">
             <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
-              Search Results ({filteredPages.length})
+              Search Results ({filteredPages.length + filteredSheets.length})
             </div>
             {filteredPages.map(page => (
               <div
@@ -421,6 +556,30 @@ export function NotebookSidebar({
                 </Tooltip>
               </div>
             ))}
+            {filteredSheets.map(sheet => (
+              <div
+                key={sheet.id}
+                className={`flex items-center gap-1 md:gap-2 pr-2 py-2 md:py-1.5 rounded-md text-sm cursor-pointer hover:bg-accent min-h-[44px] md:min-h-auto ${
+                  currentSheet?.id === sheet.id ? 'bg-accent' : ''
+                } ${draggedSheet?.id === sheet.id ? 'opacity-50' : ''}`}
+                style={{ paddingLeft: '4px', paddingRight: '8px' }}
+                onClick={() => onSelectSheet(sheet)}
+                draggable={true}
+                onDragStart={(e) => handleSheetDragStart(e, sheet)}
+                onDragEnd={handleDragEnd}
+              >
+                <GripVertical className="w-3 h-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 flex-shrink-0 cursor-grab" />
+                <Table className="w-4 h-4 text-muted-foreground" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex-1 truncate">{sheet.title}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {sheet.title}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            ))}
           </div>
         ) : (
           /* Folder Tree */
@@ -428,19 +587,19 @@ export function NotebookSidebar({
             {/* Root folders */}
             {folders.map(folder => renderFolder(folder))}
 
-            {/* Root pages and drop zone */}
-            {(rootPages.length > 0 || draggedPage) && (
+            {/* Root pages and sheets drop zone */}
+            {(rootPages.length > 0 || rootSheets.length > 0 || draggedPage || draggedSheet) && (
               <>
                 <div
                   className={`px-2 py-1 text-xs font-medium text-muted-foreground mt-4 ${
-                    dragOverFolder === null && draggedPage ? 'bg-blue-100 border-2 border-blue-400 border-dashed rounded' : ''
+                    dragOverFolder === null && (draggedPage || draggedSheet) ? 'bg-blue-100 border-2 border-blue-400 border-dashed rounded' : ''
                   }`}
                   onDragOver={handleDragOver}
                   onDragEnter={(e) => handleDragEnter(e, null)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, undefined)}
                 >
-                  {rootPages.length > 0 ? 'Uncategorized' : 'Drop here to remove from folder'}
+                  {(rootPages.length > 0 || rootSheets.length > 0) ? 'Uncategorized' : 'Drop here to remove from folder'}
                 </div>
                 {rootPages.map(page => (
                   <div
@@ -509,6 +668,73 @@ export function NotebookSidebar({
                     </DropdownMenu>
                   </div>
                 ))}
+                {rootSheets.map(sheet => (
+                  <div
+                    key={sheet.id}
+                    className={`flex items-center gap-1 md:gap-2 pr-2 py-2 md:py-1.5 rounded-md text-sm cursor-pointer hover:bg-accent group min-h-[44px] md:min-h-auto ${
+                      currentSheet?.id === sheet.id ? 'bg-accent' : ''
+                    } ${draggedSheet?.id === sheet.id ? 'opacity-50' : ''}`}
+                    style={{ paddingLeft: '4px', paddingRight: '8px' }}
+                    onClick={() => onSelectSheet(sheet)}
+                    draggable={true}
+                    onDragStart={(e) => handleSheetDragStart(e, sheet)}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <GripVertical className="w-3 h-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 flex-shrink-0 cursor-grab" />
+                    <Table className="w-4 h-4 text-muted-foreground" />
+
+                    {editingSheetId === sheet.id ? (
+                      <Input
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onBlur={saveSheetTitle}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveSheetTitle()
+                          if (e.key === 'Escape') cancelEditingSheet()
+                        }}
+                        className="h-6 text-sm flex-1"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex-1 truncate">{sheet.title}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {sheet.title}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="w-3 h-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => startEditingSheet(sheet)}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setDeleteConfirm({ type: 'sheet', id: sheet.id, name: sheet.title })}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))}
               </>
             )}
           </div>
@@ -520,11 +746,11 @@ export function NotebookSidebar({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete {deleteConfirm?.type === 'page' ? 'Note' : 'Folder'}
+              Delete {deleteConfirm?.type === 'page' ? 'Note' : deleteConfirm?.type === 'sheet' ? 'Sheet' : 'Folder'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{deleteConfirm?.name}&quot;?
-              {deleteConfirm?.type === 'folder' && ' This will also delete all notes and subfolders inside it.'}
+              {deleteConfirm?.type === 'folder' && ' This will also delete all notes, sheets, and subfolders inside it.'}
               {' '}This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

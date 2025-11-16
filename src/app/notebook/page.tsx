@@ -7,7 +7,7 @@ import { DashboardLayout } from '@/components/DashboardLayout'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { useNotebookContext } from '@/components/NotebookProvider'
 import type { NotebookPage, NotebookFolder } from '@/types/notebook'
-import { BookOpen, Plus, X, FolderOpen, MoreVertical, Folder, FileText } from 'lucide-react'
+import { BookOpen, Plus, X, FolderOpen, MoreVertical, Folder, FileText, Table } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FolderDialog } from '@/components/notebook/FolderDialog'
 import {
@@ -47,18 +47,25 @@ function NotebookPageContent() {
   const {
     folders,
     pages,
+    sheets,
     currentPage,
+    currentSheet,
     currentFolder,
     isLoading,
     error,
     createFolder,
     createPage,
+    createSheet,
     updatePage,
+    updateSheet,
     updateFolder,
     deletePage,
+    deleteSheet,
     deleteFolder,
     movePageToFolder,
+    moveSheetToFolder,
     setCurrentPage,
+    setCurrentSheet,
     setCurrentFolder
   } = useNotebookContext()
 
@@ -100,6 +107,16 @@ function NotebookPageContent() {
     }
   }
 
+  const handleCreateSheet = async (data: { title: string; folder_id?: string }) => {
+    const newSheet = await createSheet(data)
+    if (newSheet) {
+      // Set the current sheet immediately to avoid flickering
+      setCurrentSheet(newSheet)
+      // Then navigate to the new sheet URL
+      router.push(`/notebook/sheet/${newSheet.id}`)
+    }
+  }
+
   const handleCreateFolder = async (data: { name: string; parent_folder_id?: string; color?: string }) => {
     await createFolder(data)
   }
@@ -132,12 +149,30 @@ function NotebookPageContent() {
   const handleSelectFolder = (folder?: NotebookFolder) => {
     setCurrentFolder(folder)
     setCurrentPage(undefined)
+    setCurrentSheet(undefined)
     // Navigate to update the URL with the folder parameter
     if (folder) {
       router.push(`/notebook?folder=${folder.id}`)
     } else {
       router.push('/notebook')
     }
+  }
+
+  // Sheet handlers
+  const handleSelectSheet = (sheet: import('@/types/notebook').NotebookSheet) => {
+    router.push(`/notebook/sheet/${sheet.id}`)
+  }
+
+  const handleDeleteSheet = async (id: string) => {
+    await deleteSheet(id)
+  }
+
+  const handleMoveSheetToFolder = async (sheetId: string, folderId?: string) => {
+    await moveSheetToFolder(sheetId, folderId)
+  }
+
+  const handleUpdateSheetMetadata = async (id: string, data: { title?: string; is_pinned?: boolean }) => {
+    await updateSheet(id, data, true)
   }
 
   const handlePanelResize = (sizes: number[]) => {
@@ -187,6 +222,10 @@ function NotebookPageContent() {
             <FileText className="w-4 h-4 mr-2" />
             New Note
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleCreateSheet({ title: 'Untitled Sheet' })}>
+            <Table className="w-4 h-4 mr-2" />
+            New Sheet
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -209,6 +248,15 @@ function NotebookPageContent() {
         >
           <Plus className="w-4 h-4 mr-2" />
           New Note
+        </Button>
+        <Button
+          variant="default"
+          size="sm"
+          className="btn-accent"
+          onClick={() => handleCreateSheet({ title: 'Untitled Sheet' })}
+        >
+          <Table className="w-4 h-4 mr-2" />
+          New Sheet
         </Button>
       </div>
 
@@ -270,19 +318,29 @@ function NotebookPageContent() {
               <NotebookSidebar
                 folders={folders}
                 pages={pages}
+                sheets={sheets}
                 currentPage={currentPage}
+                currentSheet={currentSheet}
                 currentFolder={currentFolder}
                 onCreatePage={handleCreatePage}
+                onCreateSheet={handleCreateSheet}
                 onSelectPage={(page) => {
                   handleSelectPage(page)
                   setIsMobileSidebarOpen(false) // Close sidebar when page is selected
                 }}
+                onSelectSheet={(sheet) => {
+                  handleSelectSheet(sheet)
+                  setIsMobileSidebarOpen(false) // Close sidebar when sheet is selected
+                }}
                 onSelectFolder={handleSelectFolder}
                 onDeletePage={handleDeletePage}
+                onDeleteSheet={handleDeleteSheet}
                 onDeleteFolder={handleDeleteFolder}
                 onUpdatePage={handleUpdatePageMetadata}
+                onUpdateSheet={handleUpdateSheetMetadata}
                 onUpdateFolder={handleUpdateFolder}
                 onMovePageToFolder={handleMovePageToFolder}
+                onMoveSheetToFolder={handleMoveSheetToFolder}
               />
             </div>
           </>
@@ -300,16 +358,23 @@ function NotebookPageContent() {
               <NotebookSidebar
                 folders={folders}
                 pages={pages}
+                sheets={sheets}
                 currentPage={currentPage}
+                currentSheet={currentSheet}
                 currentFolder={currentFolder}
                 onCreatePage={handleCreatePage}
+                onCreateSheet={handleCreateSheet}
                 onSelectPage={handleSelectPage}
+                onSelectSheet={handleSelectSheet}
                 onSelectFolder={handleSelectFolder}
                 onDeletePage={handleDeletePage}
+                onDeleteSheet={handleDeleteSheet}
                 onDeleteFolder={handleDeleteFolder}
                 onUpdatePage={handleUpdatePageMetadata}
+                onUpdateSheet={handleUpdateSheetMetadata}
                 onUpdateFolder={handleUpdateFolder}
                 onMovePageToFolder={handleMovePageToFolder}
+                onMoveSheetToFolder={handleMoveSheetToFolder}
               />
             </ResizablePanel>
             <ResizableHandle withHandle />

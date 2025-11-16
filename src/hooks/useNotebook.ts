@@ -3,12 +3,16 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import { useAppData } from '@/components/AppDataProvider'
 import { deleteNotebookContent } from '@/lib/notebookStorage'
+import { deleteSheetData } from '@/lib/notebookSheetStorage'
 import {
   NotebookFolder,
   NotebookPage,
+  NotebookSheet,
   CreateFolderData,
   CreatePageData,
+  CreateSheetData,
   UpdatePageData,
+  UpdateSheetData,
   UpdateFolderData,
   NotebookState
 } from '@/types/notebook'
@@ -19,6 +23,7 @@ export function useNotebook() {
   const [state, setState] = useState<NotebookState>({
     folders: [],
     pages: [],
+    sheets: [],
     isLoading: true,
     error: undefined
   })
@@ -41,6 +46,7 @@ export function useNotebook() {
         ...prev,
         folders: [],
         pages: [],
+        sheets: [],
         isLoading: false,
         error: 'No season available. Please create a season to use the notebook.'
       }))
@@ -69,6 +75,16 @@ export function useNotebook() {
         .order('sort_order', { ascending: true })
 
       if (pagesError) throw pagesError
+
+      // Fetch sheets
+      const { data: sheets, error: sheetsError } = await supabase
+        .from('notebook_sheets')
+        .select('*')
+        .eq('team_id', team.id)
+        .eq('season_id', currentSeason.id)
+        .order('sort_order', { ascending: true })
+
+      if (sheetsError) throw sheetsError
 
 
       // Build folder tree with children and page counts
@@ -115,6 +131,7 @@ export function useNotebook() {
         ...prev,
         folders: rootFolders,
         pages: pages || [],
+        sheets: sheets || [],
         isLoading: false
       }))
 
@@ -410,6 +427,154 @@ export function useNotebook() {
     setState(prev => ({ ...prev, currentFolder: folder }))
   }, [])
 
+  // ========== SHEET OPERATIONS ==========
+
+  // Create a new sheet
+  const createSheet = useCallback(async (data: CreateSheetData): Promise<NotebookSheet | null> => {
+    if (!user || !team || !currentSeason) return null
+
+    try {
+      const { data: sheet, error } = await supabase
+        .from('notebook_sheets')
+        .insert({
+          team_id: team.id,
+          season_id: currentSeason.id,
+          title: data.title || 'Untitled Sheet',
+          folder_id: data.folder_id,
+          linked_entity_type: data.linked_entity_type,
+          linked_entity_id: data.linked_entity_id,
+          created_by: user.id,
+          updated_by: user.id
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Update local state optimistically
+      setState(prev => ({
+        ...prev,
+        sheets: [...prev.sheets, sheet]
+      }))
+
+      return sheet
+    } catch (error) {
+      console.error('Error creating sheet:', error)
+      setState(prev => ({ ...prev, error: 'Failed to create sheet' }))
+      return null
+    }
+  }, [user, team, currentSeason])
+
+  // Update a sheet
+  const updateSheet = useCallback(async (id: string, data: UpdateSheetData, immediate = false) => {
+    if (!user || !team || !currentSeason) return false
+
+    const performUpdate = async () => {
+      try {
+        const updateData: Record<string, unknown> = {
+          updated_by: user.id,
+          updated_at: new Date().toISOString()
+        }
+
+        // Only include fields that are actually being updated
+        if (data.title !== undefined) updateData.title = data.title
+        if (data.folder_id !== undefined) updateData.folder_id = data.folder_id
+        if (data.is_pinned !== undefined) updateData.is_pinned = data.is_pinned
+        if (data.sort_order !== undefined) updateData.sort_order = data.sort_order
+        if (data.linked_entity_type !== undefined) updateData.linked_entity_type = data.linked_entity_type
+        if (data.linked_entity_id !== undefined) updateData.linked_entity_id = data.linked_entity_id
+        if (data.sheet_data_path !== undefined) updateData.sheet_data_path = data.sheet_data_path
+        if (data.sheet_data_size !== undefined) updateData.sheet_data_size = data.sheet_data_size
+        if (data.column_count !== undefined) updateData.column_count = data.column_count
+        if (data.row_count !== undefined) updateData.row_count = data.row_count
+
+        const { error } = await supabase
+          .from('notebook_sheets')
+          .update(updateData)
+          .eq('id', id)
+
+        if (error) throw error
+
+        // Optimistically update local state
+        setState(prev => ({
+          ...prev,
+          sheets: prev.sheets.map(s => s.id === id ? { ...s, ...updateData } : s),
+          currentSheet: prev.currentSheet?.id === id ? { ...prev.currentSheet, ...updateData } : prev.currentSheet
+        }))
+
+        return true
+      } catch (error) {
+        console.error('Error updating sheet:', error)
+        setState(prev => ({ ...prev, error: 'Failed to update sheet' }))
+        return false
+      }
+    }
+
+    if (immediate) {
+      return await performUpdate()
+    } else {
+      // Debounced save
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+
+      saveTimeoutRef.current = setTimeout(async () => {
+        await performUpdate()
+      }, 1000) // 1 second debounce
+
+      return true
+    }
+  }, [user, team, currentSeason])
+
+  // Delete a sheet
+  const deleteSheet = useCallback(async (id: string): Promise<boolean> => {
+    if (!user || !team || !currentSeason) return false
+
+    try {
+      // First, delete sheet data from storage if it exists
+      const storageResult = await deleteSheetData(team.id, currentSeason.id, id)
+
+      if (!storageResult.success) {
+        console.warn('Failed to delete sheet data from storage:', storageResult.error)
+        // Continue with sheet deletion even if storage deletion fails
+      }
+
+      // Delete the sheet record from database
+      const { error } = await supabase
+        .from('notebook_sheets')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+
+      setState(prev => ({
+        ...prev,
+        sheets: prev.sheets.filter(sheet => sheet.id !== id),
+        currentSheet: prev.currentSheet?.id === id ? undefined : prev.currentSheet
+      }))
+
+      return true
+    } catch (error) {
+      console.error('Error deleting sheet:', error)
+      setState(prev => ({ ...prev, error: 'Failed to delete sheet' }))
+      return false
+    }
+  }, [user, team, currentSeason])
+
+  // Move sheet to different folder
+  const moveSheetToFolder = useCallback(async (sheetId: string, folderId?: string): Promise<boolean> => {
+    const success = await updateSheet(sheetId, { folder_id: folderId }, true)
+    if (success) {
+      await fetchNotebookData()
+    }
+    return success
+  }, [updateSheet, fetchNotebookData])
+
+  // Set current sheet
+  const setCurrentSheet = useCallback((sheet?: NotebookSheet) => {
+    setState(prev => ({ ...prev, currentSheet: sheet }))
+  }, [])
+
   // Get notebook page linked to a specific entity (reverse lookup)
   const getPageByEntity = useCallback(async (
     entityType: import('@/types/notebook').LinkedEntityType,
@@ -476,16 +641,24 @@ export function useNotebook() {
 
   return {
     ...state,
-    // Actions
+    // Folder actions
     createFolder,
+    updateFolder,
+    deleteFolder,
+    setCurrentFolder,
+    // Page actions
     createPage,
     updatePage,
-    updateFolder,
     deletePage,
-    deleteFolder,
     movePageToFolder,
     setCurrentPage,
-    setCurrentFolder,
+    // Sheet actions
+    createSheet,
+    updateSheet,
+    deleteSheet,
+    moveSheetToFolder,
+    setCurrentSheet,
+    // Common actions
     refreshData: fetchNotebookData,
     // Entity linking
     getPageByEntity,
