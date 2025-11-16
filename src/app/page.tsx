@@ -58,7 +58,7 @@ function AppContent() {
   // Show loading while checking setup status
   if (loading || authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-4" />
@@ -84,7 +84,7 @@ function AppContent() {
   // If authenticated, redirect to dashboard (handled by useEffect above)
   // Show loading while redirecting
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardContent className="flex flex-col items-center justify-center p-8">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-4" />

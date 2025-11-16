@@ -43,6 +43,12 @@ export function FieldAnnotation({ value, onChange, disabled }: FieldAnnotationPr
   const [imageLoaded, setImageLoaded] = useState(false)
   const [baseAnnotation, setBaseAnnotation] = useState<string | null>(null)
 
+  // Clear strokes when value changes (navigating to different response)
+  useEffect(() => {
+    setStrokes([])
+    setCurrentStroke([])
+  }, [value])
+
   const drawStrokes = useCallback((ctx: CanvasRenderingContext2D) => {
     // Redraw all strokes
     strokes.forEach(stroke => {
@@ -344,7 +350,7 @@ export function FieldAnnotation({ value, onChange, disabled }: FieldAnnotationPr
       </div>
 
       {/* Canvas */}
-      <div className="border rounded-lg overflow-hidden bg-gray-100">
+      <div className="border rounded-lg overflow-hidden bg-gray-100 max-w-full md:max-w-2xl">
         <canvas
           ref={canvasRef}
           onMouseDown={startDrawing}

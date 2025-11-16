@@ -4,6 +4,8 @@ import { ftcEventsService, FTCTeam } from '@/lib/ftcEventsService'
 import { rateLimit, RateLimitPresets } from '@/lib/rateLimit'
 import { supabase } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
+
 interface CachedTeam {
   team_number: number
   season: number

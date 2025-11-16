@@ -82,6 +82,9 @@ export function EventScoutingSheets({
   const [saving, setSaving] = useState(false)
   const [editedResponses, setEditedResponses] = useState<Record<string, Record<string, ResponseValue>>>({})
   const [uploadingImages, setUploadingImages] = useState<Record<string, boolean>>({})
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
+  const [swipeAnimation, setSwipeAnimation] = useState<'exit-left' | 'exit-right' | 'enter-from-left' | 'enter-from-right' | null>(null)
 
   const fetchResponses = useCallback(async () => {
     setLoading(true)
@@ -255,6 +258,59 @@ export function EventScoutingSheets({
     setCurrentIndex(prev => prev + 1)
   }
 
+  // Swipe gesture handlers
+  const minSwipeDistance = 50 // Minimum distance for a swipe
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    // Don't register swipes if touching a canvas (field annotation)
+    const target = e.target as HTMLElement
+    if (target.tagName === 'CANVAS' || target.closest('canvas')) {
+      setTouchStart(null)
+      setTouchEnd(null)
+      return
+    }
+
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    // Only track movement if we have a valid touchStart (not on canvas)
+    if (touchStart === null) return
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > minSwipeDistance
+    const isRightSwipe = distance < -minSwipeDistance
+
+    if (isLeftSwipe && hasNext) {
+      // Swipe left to go to NEXT - exit left, enter from right
+      setSwipeAnimation('exit-left')
+      setTimeout(() => {
+        handleNext()
+        setSwipeAnimation('enter-from-right')
+        setTimeout(() => {
+          setSwipeAnimation(null)
+        }, 250)
+      }, 50) // Start new sheet almost immediately
+    }
+    if (isRightSwipe && hasPrevious) {
+      // Swipe right to go to PREVIOUS - exit right, enter from left
+      setSwipeAnimation('exit-right')
+      setTimeout(() => {
+        handlePrevious()
+        setSwipeAnimation('enter-from-left')
+        setTimeout(() => {
+          setSwipeAnimation(null)
+        }, 250)
+      }, 50) // Start new sheet almost immediately
+    }
+  }
+
   const setResponse = (questionId: string, value: string | number | string[]) => {
     if (!currentResponse) return
 
@@ -354,9 +410,19 @@ export function EventScoutingSheets({
             id: data[0].id,
             responses: updatedResponses
           }
-          setResponses([newResponse])
-          // Update edited responses to use the new ID
-          setEditedResponses({ [data[0].id]: updatedResponses })
+          // Update the specific response in the array, not replace the whole array
+          setResponses(prev => prev.map(resp =>
+            resp.id === currentResponse.id
+              ? newResponse
+              : resp
+          ))
+          // Update edited responses to use the new ID, preserving existing edits
+          setEditedResponses(prev => {
+            const newEdits = { ...prev }
+            delete newEdits[currentResponse.id] // Remove old temp ID
+            newEdits[data[0].id] = updatedResponses // Add new database ID
+            return newEdits
+          })
           if (!silent) toast.success('Scouting sheet saved successfully')
           return true
         }
@@ -397,14 +463,20 @@ export function EventScoutingSheets({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-full md:max-w-6xl h-[100vh] md:h-[90vh] w-full p-0 md:p-6 gap-0 overflow-y-auto">
-        <div className="p-4 md:p-0">
-        <DialogHeader className="hidden md:block mb-6">
+      <DialogContent className="max-w-full md:max-w-6xl h-[100dvh] md:h-[90vh] w-full p-0 md:p-6 gap-0 flex flex-col">
+        <DialogHeader className="hidden md:block mb-6 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             Scouting Sheets - {eventName}
           </DialogTitle>
         </DialogHeader>
+        <div
+          className="flex-1 overflow-y-auto p-4 md:p-0 pb-4 md:pb-0"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+        <div>
 
         {loading ? (
           <div className="flex items-center justify-center p-8">
@@ -430,10 +502,32 @@ export function EventScoutingSheets({
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div
+            key={currentIndex}
+            className="space-y-6"
+            style={{
+              transform:
+                swipeAnimation === 'exit-left'
+                  ? 'translateX(-100%)'
+                  : swipeAnimation === 'exit-right'
+                  ? 'translateX(100%)'
+                  : 'translateX(0)',
+              opacity:
+                swipeAnimation === 'exit-left' || swipeAnimation === 'exit-right'
+                  ? 0
+                  : 1,
+              transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              animation:
+                swipeAnimation === 'enter-from-right'
+                  ? 'slideInFromRight 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                  : swipeAnimation === 'enter-from-left'
+                  ? 'slideInFromLeft 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                  : 'none'
+            }}
+          >
             {/* Navigation Header - Only show if there are multiple responses */}
             {responses.length > 1 ? (
-              <div className="flex items-center justify-between border-b pb-3 mb-4 pr-8 md:pr-0">
+              <div className="sticky top-0 z-10 bg-background flex items-center justify-between border-b pb-3 mb-4 md:relative md:bg-transparent">
                 <Button
                   variant="outline"
                   size="sm"
@@ -707,6 +801,7 @@ export function EventScoutingSheets({
 
                     {type === 'field' && (
                       <FieldAnnotation
+                        key={`${currentResponse.id}-${q.id}`}
                         value={response as string}
                         onChange={(dataUrl) => setResponse(q.id, dataUrl)}
                         disabled={saving}
@@ -725,6 +820,7 @@ export function EventScoutingSheets({
             )}
           </div>
         )}
+        </div>
         </div>
       </DialogContent>
     </Dialog>

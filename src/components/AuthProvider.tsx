@@ -60,9 +60,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
           router.push('/')
         }
 
-        // Log authentication errors
+        // Handle token refresh failures - sign out and redirect
         if (event === 'TOKEN_REFRESHED' && !session) {
-          console.error('❌ Token refresh failed')
+          console.error('❌ Token refresh failed - signing out')
+          await supabase.auth.signOut()
+          router.push('/?message=Session expired. Please sign in again.')
+        }
+
+        // Handle general auth errors
+        if (event === 'USER_UPDATED' && !session) {
+          console.error('❌ User update failed - invalid session')
+          await supabase.auth.signOut()
+          router.push('/?message=Session expired. Please sign in again.')
         }
       }
     )

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/api-auth'
 import { handleAPIError, ValidationError } from '@/lib/api-errors'
 
+export const dynamic = 'force-dynamic'
+
 // Helper function to format date as YYYY-MM-DD in local timezone
 function formatLocalDate(date: Date): string {
     const year = date.getFullYear()

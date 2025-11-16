@@ -138,6 +138,10 @@
     @apply bg-background text-foreground;
     transition: var(--theme-transition, background-color 0.3s ease, color 0.3s ease);
   }
+  /* Prevent iOS Safari auto-zoom on input focus */
+  input, select, textarea {
+    font-size: max(16px, 1rem);
+  }
 }
 
 /* Enhanced smooth theme transitions for all components */
@@ -176,6 +180,7 @@ svg, .icon {
 
 .auth-container .supabase-auth-ui_ui-input {
   @apply w-full px-3 py-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent;
+  font-size: max(16px, 1rem) !important;
 }
 
 .auth-container .supabase-auth-ui_ui-label {
@@ -549,4 +554,27 @@ textarea:focus {
 .link-accent:hover {
   color: var(--accent-color-hover);
   text-decoration-color: var(--accent-color-hover);
+}
+
+/* Swipe animation keyframes */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }

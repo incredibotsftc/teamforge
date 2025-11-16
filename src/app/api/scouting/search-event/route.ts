@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit, RateLimitPresets } from '@/lib/rateLimit'
 import { ftcEventsService, type FTCEvent, type FTCRanking } from '@/lib/ftcEventsService'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   // Apply rate limiting
   const rateLimitResult = await rateLimit(request, RateLimitPresets.SCOUTING_SEARCH)

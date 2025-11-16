@@ -28,7 +28,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // Show loading spinner while checking auth
   if (authLoading || appDataLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-4" />
@@ -42,7 +42,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // User not authenticated - redirect happening, show loading
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mb-4" />
