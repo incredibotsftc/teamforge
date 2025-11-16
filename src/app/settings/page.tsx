@@ -8,6 +8,7 @@ import { useAppData } from '@/components/AppDataProvider'
 import { useTheme } from '@/components/ThemeProvider'
 import { useAccentColorContext } from '@/components/AccentColorProvider'
 import { supabase } from '@/lib/supabase'
+import { APP_VERSION } from '@/lib/version'
 import { Settings, Palette, User, Sun, Moon, Monitor, Info, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -339,7 +340,7 @@ export default function SettingsPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Version</span>
-                      <span className="text-sm text-muted-foreground">0.1.0</span>
+                      <span className="text-sm text-muted-foreground">{APP_VERSION}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Built by</span>
