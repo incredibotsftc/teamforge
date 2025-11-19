@@ -28,7 +28,7 @@ export interface NotebookPage {
   content?: unknown // JSONB content from the editor (legacy, being phased out)
   content_path?: string // Path to content file in storage
   content_size?: number // Size of content file in bytes
-  content_text: string // Plain text for search
+  content_text: string | null // Plain text for search
   is_pinned: boolean
   sort_order: number
   linked_entity_type?: LinkedEntityType
