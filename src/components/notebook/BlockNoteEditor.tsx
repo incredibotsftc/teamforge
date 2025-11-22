@@ -15,9 +15,10 @@ import { loadNotebookContent } from '@/lib/notebookStorage'
 import { useAppData } from '@/components/AppDataProvider'
 import { useAuth } from '@/components/AuthProvider'
 import { useTheme } from '@/components/ThemeProvider'
-import { useCollaborativeNotebook } from '@/hooks/useCollaborativeNotebook'
 import type { Block } from '@blocknote/core'
-import type { CollaborativeNotebookConfig } from '@/lib/yjs/types'
+import * as Y from 'yjs'
+import { SupabaseYjsProvider } from '@/lib/yjs/SupabaseYjsProvider'
+import type { ConnectionState } from '@/lib/yjs/types'
 
 interface BlockNoteEditorProps {
   page?: NotebookPage
@@ -43,18 +44,65 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
   // Ref to store editor instance for callbacks
   const editorRef = useRef<ReturnType<typeof useCreateBlockNote> | null>(null)
 
-  // Get current blocks function for snapshots
-  const getCurrentBlocks = useCallback((): Block[] => {
-    if (!editorRef.current) return []
-    return editorRef.current.document
-  }, [])
+  // Stable Yjs document and provider - created once per page
+  const yjsDocRef = useRef<Y.Doc | null>(null)
+  const yjsProviderRef = useRef<SupabaseYjsProvider | null>(null)
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
+  const [activeEditors, setActiveEditors] = useState<Array<{ id: string; name: string; color: string }>>([])
 
-  // For now, disable Yjs collaboration to fix runtime error
-  // Will be re-enabled after proper setup
-  const doc = null
-  const provider = null
-  const syncStatus = { state: 'connected' as 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'error', isSynced: true, pendingUpdates: 0 }
-  const activeEditors: any[] = []
+  // Initialize Yjs doc and provider when page changes
+  useEffect(() => {
+    if (!page || !team || !currentSeason || !user) {
+      // Clean up old provider
+      if (yjsProviderRef.current) {
+        yjsProviderRef.current.destroy()
+        yjsProviderRef.current = null
+      }
+      if (yjsDocRef.current) {
+        yjsDocRef.current.destroy()
+        yjsDocRef.current = null
+      }
+      return
+    }
+
+    // Create new Yjs doc for this page
+    const doc = new Y.Doc()
+    yjsDocRef.current = doc
+
+    // Create Supabase provider for sync
+    const provider = new SupabaseYjsProvider(doc, {
+      teamId: team.id,
+      pageId: page.id,
+      userId: user.id,
+      userName: user.user_metadata?.display_name || user.email || 'Anonymous',
+      userColor: user.user_metadata?.accent_color || '#6366f1'
+    })
+    yjsProviderRef.current = provider
+
+    // Listen for connection state changes
+    provider.on('status', ({ data }) => {
+      setConnectionState((data as { state: ConnectionState }).state)
+    })
+
+    // Listen for awareness updates (active editors)
+    provider.on('awareness-update', () => {
+      setActiveEditors(provider.getActiveEditors())
+    })
+
+    // Cleanup on page change or unmount
+    return () => {
+      provider.destroy()
+      doc.destroy()
+    }
+  }, [page?.id, team?.id, currentSeason?.id, user?.id])
+
+  const doc = yjsDocRef.current
+  const provider = yjsProviderRef.current
+  const syncStatus = {
+    state: connectionState,
+    isSynced: connectionState === 'connected',
+    pendingUpdates: 0
+  }
 
   // Image upload handler
   const handleUploadFile = useCallback(async (file: File): Promise<string> => {
@@ -136,35 +184,41 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
     loadPageContent()
   }, [page?.id, team?.id, currentSeason?.id])
 
-  // Create BlockNote editor instance
-  // TODO: Re-enable Yjs collaboration after fixing module loading issues
+  // Create BlockNote editor instance with Yjs collaboration
   const editor = useCreateBlockNote({
     initialContent: initialContent,
-    uploadFile: handleUploadFile
-  }, [initialContent])
+    uploadFile: handleUploadFile,
+    collaboration: doc && provider ? {
+      provider: provider as any, // SupabaseYjsProvider implements Yjs provider interface
+      fragment: doc.getXmlFragment('blocknote'),
+      user: {
+        name: user?.user_metadata?.display_name || user?.email || 'Anonymous',
+        color: user?.user_metadata?.accent_color || '#6366f1'
+      }
+    } : undefined
+  }, [initialContent, doc, provider])
 
   // Store editor ref for callbacks
   useEffect(() => {
     editorRef.current = editor
   }, [editor])
 
-  // Simple periodic auto-save (every 5 seconds if there are changes)
+  // Periodic snapshot backup (every 30 seconds)
   useEffect(() => {
-    if (!page || !editor || !initialContent) return
+    if (!page || !editor || !initialContent || !team || !currentSeason) return
 
-    let lastSaveTime = Date.now()
-    const saveInterval = setInterval(async () => {
+    const snapshotInterval = setInterval(async () => {
       try {
         const blocks = editor.document
         const { saveNotebookContent } = await import('@/lib/notebookStorage')
-        await saveNotebookContent(team!.id, currentSeason!.id, page.id, blocks)
-        lastSaveTime = Date.now()
+        await saveNotebookContent(team.id, currentSeason.id, page.id, blocks)
+        console.log('[Editor] Snapshot saved')
       } catch (error) {
-        console.error('[Editor] Auto-save error:', error)
+        console.error('[Editor] Snapshot save error:', error)
       }
-    }, 5000) // Save every 5 seconds
+    }, 30000) // Snapshot every 30 seconds
 
-    return () => clearInterval(saveInterval)
+    return () => clearInterval(snapshotInterval)
   }, [page?.id, editor, initialContent, team, currentSeason])
 
   // Sync local state with page prop changes
