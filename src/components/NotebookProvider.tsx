@@ -25,6 +25,7 @@ interface NotebookContextType {
   deletePage: (id: string) => Promise<boolean>
   deleteFolder: (id: string) => Promise<boolean>
   movePageToFolder: (pageId: string, folderId?: string) => Promise<boolean>
+  reorderPages: (pageId: string, newPosition: number, folderId?: string) => Promise<boolean>
   setCurrentPage: (page?: NotebookPage) => void
   setCurrentFolder: (folder?: NotebookFolder) => void
   refreshData: () => Promise<void>

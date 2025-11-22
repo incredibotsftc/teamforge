@@ -60,6 +60,7 @@ export default function NotePage() {
     deletePage,
     deleteFolder,
     movePageToFolder,
+    reorderPages,
     setCurrentPage,
     setCurrentFolder
   } = useNotebookContext()
@@ -143,6 +144,10 @@ export default function NotePage() {
     await movePageToFolder(pageId, folderId)
   }, [movePageToFolder])
 
+  const handleReorderPage = useCallback(async (pageId: string, newPosition: number, folderId?: string) => {
+    await reorderPages(pageId, newPosition, folderId)
+  }, [reorderPages])
+
   const handleUpdatePageMetadata = useCallback(async (id: string, data: { title?: string; is_pinned?: boolean }) => {
     await updatePage(id, data, true)
   }, [updatePage])
@@ -211,7 +216,7 @@ export default function NotePage() {
             <Folder className="w-4 h-4 mr-2" />
             Add Folder
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleCreatePage({ title: 'Untitled' })}>
+          <DropdownMenuItem onClick={() => handleCreatePage({ title: 'Untitled', folder_id: currentPage?.folder_id })}>
             <FileText className="w-4 h-4 mr-2" />
             New Note
           </DropdownMenuItem>
@@ -233,7 +238,7 @@ export default function NotePage() {
           variant="default"
           size="sm"
           className="btn-accent"
-          onClick={() => handleCreatePage({ title: 'Untitled' })}
+          onClick={() => handleCreatePage({ title: 'Untitled', folder_id: currentPage?.folder_id })}
         >
           <FileText className="w-4 h-4 mr-2" />
           New Note
@@ -249,7 +254,7 @@ export default function NotePage() {
         trigger={<span className="hidden" />}
       />
     </>
-  ), [isMobileSidebarOpen, folders, handleCreateFolder, handleCreatePage, isFolderDialogOpen])
+  ), [isMobileSidebarOpen, folders, handleCreateFolder, handleCreatePage, isFolderDialogOpen, currentPage?.folder_id])
 
   if (isLoading) {
     return (
@@ -308,6 +313,7 @@ export default function NotePage() {
                 onUpdatePage={handleUpdatePageMetadata}
                 onUpdateFolder={handleUpdateFolder}
                 onMovePageToFolder={handleMovePageToFolder}
+                onReorderPage={handleReorderPage}
               />
             </div>
           </>
@@ -335,6 +341,7 @@ export default function NotePage() {
                 onUpdatePage={handleUpdatePageMetadata}
                 onUpdateFolder={handleUpdateFolder}
                 onMovePageToFolder={handleMovePageToFolder}
+                onReorderPage={handleReorderPage}
               />
             </ResizablePanel>
             <ResizableHandle withHandle />

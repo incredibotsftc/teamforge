@@ -400,6 +400,104 @@ export function useNotebook() {
     return success
   }, [updatePage, fetchNotebookData])
 
+  // Reorder pages with optimistic update
+  const reorderPages = useCallback(async (pageId: string, newPosition: number, folderId?: string): Promise<boolean> => {
+    if (!user || !team || !currentSeason) return false
+
+    try {
+      // Get the session token for authentication
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        console.error('No active session')
+        return false
+      }
+
+      // Optimistically update local state immediately
+      setState(prev => {
+        // Find the page being moved
+        const pageToMove = prev.pages.find(p => p.id === pageId)
+        if (!pageToMove) return prev
+
+        // Get pages in the TARGET folder
+        const pagesInTargetFolder = prev.pages
+          .filter(p => (p.folder_id || null) === (folderId || null))
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+
+        // Calculate new ordering
+        const otherPages = pagesInTargetFolder.filter(p => p.id !== pageId)
+        const reorderedPages = [
+          ...otherPages.slice(0, newPosition),
+          pageToMove,
+          ...otherPages.slice(newPosition)
+        ]
+
+        // Update sort_order for all pages in target folder
+        const updatedPagesMap = new Map(
+          reorderedPages.map((p, index) => [
+            p.id,
+            {
+              ...p,
+              sort_order: index,
+              folder_id: p.id === pageId ? (folderId || null) : p.folder_id
+            }
+          ])
+        )
+
+        // Apply updates to all pages in main array
+        const newPages = prev.pages.map(page => {
+          const updated = updatedPagesMap.get(page.id)
+          return updated || page
+        })
+
+        // Update folder structure - rebuild pages arrays for affected folders
+        const updateFolderPages = (folders: NotebookFolder[]): NotebookFolder[] => {
+          return folders.map(folder => {
+            // Rebuild pages array from the newPages array
+            const folderPages = newPages
+              .filter(page => page.folder_id === folder.id)
+              .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+
+            return {
+              ...folder,
+              pages: folderPages,
+              page_count: folderPages.length,
+              children: folder.children ? updateFolderPages(folder.children) : []
+            }
+          })
+        }
+
+        return {
+          ...prev,
+          pages: newPages,
+          folders: updateFolderPages(prev.folders)
+        }
+      })
+
+      // Make API call in background
+      const response = await fetch('/api/notebook/reorder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ pageId, newPosition, folderId })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(`Failed to reorder page: ${errorData.error || response.statusText}`)
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error reordering pages:', error)
+      // On error, refresh data to revert optimistic update
+      await fetchNotebookData()
+      setState(prev => ({ ...prev, error: 'Failed to reorder pages' }))
+      return false
+    }
+  }, [user, team, currentSeason, fetchNotebookData])
+
   // Set current page
   const setCurrentPage = useCallback((page?: NotebookPage) => {
     setState(prev => ({ ...prev, currentPage: page }))
@@ -484,6 +582,7 @@ export function useNotebook() {
     deletePage,
     deleteFolder,
     movePageToFolder,
+    reorderPages,
     setCurrentPage,
     setCurrentFolder,
     refreshData: fetchNotebookData,

@@ -1,24 +1,23 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useCreateBlockNote } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/mantine'
 import '@blocknote/core/fonts/inter.css'
 import '@blocknote/mantine/style.css'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { FileText, Loader2, Check, Link2, Calendar, Users, FolderKanban, AlertCircle, Wifi, WifiOff } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { FileText, Loader2, Link2, Calendar, Users, FolderKanban, AlertCircle, Save, Clock } from 'lucide-react'
 import { NotebookPage, LinkedEntityType } from '@/types/notebook'
 import { EntityLinkSelector } from './EntityLinkSelector'
 import { supabase } from '@/lib/supabase'
-import { loadNotebookContent } from '@/lib/notebookStorage'
+import { loadNotebookContent, saveNotebookContent, extractPlainText } from '@/lib/notebookStorage'
 import { useAppData } from '@/components/AppDataProvider'
 import { useAuth } from '@/components/AuthProvider'
 import { useTheme } from '@/components/ThemeProvider'
 import type { Block } from '@blocknote/core'
-import * as Y from 'yjs'
-import { SupabaseYjsProvider } from '@/lib/yjs/SupabaseYjsProvider'
-import type { ConnectionState } from '@/lib/yjs/types'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface BlockNoteEditorProps {
   page?: NotebookPage
@@ -30,89 +29,39 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
   const { team, currentSeason } = useAppData()
   const { user } = useAuth()
   const { resolvedTheme } = useTheme()
-  const [title, setTitle] = useState('Untitled')
 
+  const [title, setTitle] = useState('Untitled')
   const [initialContent, setInitialContent] = useState<Block[] | undefined>(undefined)
   const [linkedEntityType, setLinkedEntityType] = useState<LinkedEntityType | undefined>(page?.linked_entity_type)
   const [linkedEntityId, setLinkedEntityId] = useState<string | undefined>(page?.linked_entity_id)
   const [showLinkSelector, setShowLinkSelector] = useState(false)
 
-  // Track refs
+  // Save state
+  const [isSaving, setIsSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [hasPendingSave, setHasPendingSave] = useState(false)
+  const [isEditorReady, setIsEditorReady] = useState(false)
+
+  // Concurrent edit detection
+  const [activeEditors, setActiveEditors] = useState<Array<{ user_id: string; user_name: string }>>([])
+  const [showConflictWarning, setShowConflictWarning] = useState(false)
+
+  // Refs
   const titleInputRef = useRef<HTMLInputElement>(null)
   const isEditingTitleRef = useRef(false)
-
-  // Ref to store editor instance for callbacks
   const editorRef = useRef<ReturnType<typeof useCreateBlockNote> | null>(null)
-
-  // Stable Yjs document and provider - created once per page
-  const yjsDocRef = useRef<Y.Doc | null>(null)
-  const yjsProviderRef = useRef<SupabaseYjsProvider | null>(null)
-  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
-  const [activeEditors, setActiveEditors] = useState<Array<{ id: string; name: string; color: string }>>([])
-
-  // Initialize Yjs doc and provider when page changes
-  useEffect(() => {
-    if (!page || !team || !currentSeason || !user) {
-      // Clean up old provider
-      if (yjsProviderRef.current) {
-        yjsProviderRef.current.destroy()
-        yjsProviderRef.current = null
-      }
-      if (yjsDocRef.current) {
-        yjsDocRef.current.destroy()
-        yjsDocRef.current = null
-      }
-      return
-    }
-
-    // Create new Yjs doc for this page
-    const doc = new Y.Doc()
-    yjsDocRef.current = doc
-
-    // Create Supabase provider for sync
-    const provider = new SupabaseYjsProvider(doc, {
-      teamId: team.id,
-      pageId: page.id,
-      userId: user.id,
-      userName: user.user_metadata?.display_name || user.email || 'Anonymous',
-      userColor: user.user_metadata?.accent_color || '#6366f1'
-    })
-    yjsProviderRef.current = provider
-
-    // Listen for connection state changes
-    provider.on('status', ({ data }) => {
-      setConnectionState((data as { state: ConnectionState }).state)
-    })
-
-    // Listen for awareness updates (active editors)
-    provider.on('awareness-update', () => {
-      setActiveEditors(provider.getActiveEditors())
-    })
-
-    // Cleanup on page change or unmount
-    return () => {
-      provider.destroy()
-      doc.destroy()
-    }
-  }, [page?.id, team?.id, currentSeason?.id, user?.id])
-
-  const doc = yjsDocRef.current
-  const provider = yjsProviderRef.current
-  const syncStatus = {
-    state: connectionState,
-    isSynced: connectionState === 'connected',
-    pendingUpdates: 0
-  }
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const realtimeChannelRef = useRef<RealtimeChannel | null>(null)
+  const lastRemoteUpdateRef = useRef<Date | null>(null)
+  const lastLoadedPageIdRef = useRef<string | null>(null)
 
   // Image upload handler
   const handleUploadFile = useCallback(async (file: File): Promise<string> => {
     try {
-      // Generate unique filename with timestamp
       const fileExt = file.name.split('.').pop()
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
       const filePath = `${page?.team_id || 'temp'}/${fileName}`
 
-      // Upload to Supabase storage
       const { error } = await supabase.storage
         .from('notebook-images')
         .upload(filePath, file, {
@@ -125,7 +74,6 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
         throw new Error('Failed to upload image')
       }
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('notebook-images')
         .getPublicUrl(filePath)
@@ -137,89 +85,221 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
     }
   }, [page?.team_id])
 
-  // Load content when page changes
+  // Create BlockNote editor instance
+  const editor = useCreateBlockNote({
+    uploadFile: handleUploadFile,
+    initialContent: initialContent
+  }, [initialContent])
+
+  // Store editor ref and track when editor view is ready
+  useEffect(() => {
+    editorRef.current = editor
+
+    if (editor) {
+      // Give the editor a moment to fully initialize its view
+      // This prevents "editor view is not available" errors with complex content (e.g., images)
+      const timer = setTimeout(() => {
+        setIsEditorReady(true)
+      }, 100)
+
+      return () => {
+        clearTimeout(timer)
+        setIsEditorReady(false)
+      }
+    } else {
+      setIsEditorReady(false)
+    }
+  }, [editor])
+
+  // Load initial content - ONLY when page ID changes (not on every page object update)
   useEffect(() => {
     if (!page || !team || !currentSeason) {
       setInitialContent(undefined)
+      lastLoadedPageIdRef.current = null
       return
     }
 
-    const loadPageContent = async () => {
-      let loadedBlocks: Block[] | undefined
-
-      try {
-        // Load from Supabase Storage
-        if (page.content_path) {
-          const result = await loadNotebookContent(team.id, currentSeason.id, page.id)
-          if (result.success && result.blocks) {
-            loadedBlocks = result.blocks
-          }
-        }
-        // FALLBACK: Legacy content from DB
-        else if (page.content) {
-          if (Array.isArray(page.content)) {
-            loadedBlocks = page.content as Block[]
-          } else if (typeof page.content === 'string') {
-            try {
-              const parsed = JSON.parse(page.content)
-              if (Array.isArray(parsed)) {
-                loadedBlocks = parsed as Block[]
-              }
-            } catch (e) {
-              console.warn('Failed to parse content as JSON:', e)
-            }
-          }
-        }
-      } catch (error) {
-        console.error('[Editor] Error loading content:', error)
-      }
-
-      const blocksToLoad = loadedBlocks && loadedBlocks.length > 0
-        ? loadedBlocks
-        : [{ type: 'paragraph', content: [] }] as unknown as Block[]
-
-      setInitialContent(blocksToLoad)
+    // Only reload if we're navigating to a different page
+    if (lastLoadedPageIdRef.current === page.id) {
+      return
     }
 
-    loadPageContent()
+    let isMounted = true
+
+    const loadContent = async () => {
+      try {
+        console.log('[Editor] Loading content for page:', page.id)
+        const result = await loadNotebookContent(team.id, currentSeason.id, page.id)
+
+        if (!isMounted) return
+
+        if (result.success && result.blocks && result.blocks.length > 0) {
+          console.log('[Editor] Loaded', result.blocks.length, 'blocks')
+          setInitialContent(result.blocks)
+        } else {
+          // New page or empty content - let BlockNote create default content
+          console.log('[Editor] No saved content, using default empty content')
+          setInitialContent(undefined)
+        }
+
+        lastLoadedPageIdRef.current = page.id
+      } catch {
+        // Gracefully handle errors (e.g., file not found for new pages)
+        console.log('[Editor] Could not load content (likely new page), using default empty content')
+        setInitialContent(undefined)
+        lastLoadedPageIdRef.current = page.id
+      }
+    }
+
+    loadContent()
+
+    return () => {
+      isMounted = false
+    }
   }, [page?.id, team?.id, currentSeason?.id])
 
-  // Create BlockNote editor instance with Yjs collaboration
-  const editor = useCreateBlockNote({
-    initialContent: initialContent,
-    uploadFile: handleUploadFile,
-    collaboration: doc && provider ? {
-      provider: provider as any, // SupabaseYjsProvider implements Yjs provider interface
-      fragment: doc.getXmlFragment('blocknote'),
-      user: {
-        name: user?.user_metadata?.display_name || user?.email || 'Anonymous',
-        color: user?.user_metadata?.accent_color || '#6366f1'
+  // Auto-save function
+  const saveContent = useCallback(async () => {
+    if (!page || !editor || !team || !currentSeason || !onUpdatePage) return
+
+    try {
+      setIsSaving(true)
+      const blocks = editor.document
+
+      console.log('[Editor] Saving', blocks.length, 'blocks')
+
+      // Save to storage
+      const result = await saveNotebookContent(
+        team.id,
+        currentSeason.id,
+        page.id,
+        blocks
+      )
+
+      if (result.success) {
+        // Extract plain text for search
+        const contentText = extractPlainText(blocks)
+
+        // Update metadata in database
+        await onUpdatePage(page.id, {
+          content: blocks,
+          content_text: contentText,
+          content_path: result.path,
+          content_size: result.size
+        })
+
+        setLastSaved(new Date())
+        setHasPendingSave(false)
+        console.log('[Editor] Saved successfully')
+      } else {
+        console.error('[Editor] Save failed:', result.error)
       }
-    } : undefined
-  }, [initialContent, doc, provider])
+    } catch (error) {
+      console.error('[Editor] Error saving:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [page, editor, team, currentSeason, onUpdatePage])
 
-  // Store editor ref for callbacks
+  // Debounced auto-save on content change
   useEffect(() => {
-    editorRef.current = editor
-  }, [editor])
+    if (!editor) return
 
-  // Periodic snapshot backup (every 30 seconds)
-  useEffect(() => {
-    if (!page || !editor || !initialContent || !team || !currentSeason) return
+    const handleChange = () => {
+      setHasPendingSave(true)
 
-    const snapshotInterval = setInterval(async () => {
-      try {
-        const blocks = editor.document
-        const { saveNotebookContent } = await import('@/lib/notebookStorage')
-        await saveNotebookContent(team.id, currentSeason.id, page.id, blocks)
-        console.log('[Editor] Snapshot saved')
-      } catch (error) {
-        console.error('[Editor] Snapshot save error:', error)
+      // Clear existing timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
       }
-    }, 30000) // Snapshot every 30 seconds
 
-    return () => clearInterval(snapshotInterval)
-  }, [page?.id, editor, initialContent, team, currentSeason])
+      // Save after 5 seconds of inactivity
+      saveTimeoutRef.current = setTimeout(() => {
+        saveContent()
+      }, 5000)
+    }
+
+    // Listen to editor changes
+    editor.onChange(handleChange)
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [editor, saveContent])
+
+  // Realtime subscription for concurrent edit detection
+  useEffect(() => {
+    if (!page || !team || !user) return
+
+    const channelName = `notebook:${page.id}`
+    const channel = supabase.channel(channelName)
+
+    // Broadcast presence
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState()
+        const editors = Object.values(state)
+          .flat()
+          .filter((editor) => {
+            const e = editor as unknown as { user_id: string; user_name: string }
+            return e.user_id !== user.id
+          })
+          .map((editor) => {
+            const e = editor as unknown as { user_id: string; user_name: string }
+            return {
+              user_id: e.user_id,
+              user_name: e.user_name
+            }
+          })
+
+        setActiveEditors(editors)
+      })
+      .on('broadcast', { event: 'page_updated' }, () => {
+        // Detect remote updates
+        lastRemoteUpdateRef.current = new Date()
+
+        // Show conflict warning if user is editing
+        if (hasPendingSave) {
+          setShowConflictWarning(true)
+          // Auto-hide warning after 10 seconds
+          setTimeout(() => setShowConflictWarning(false), 10000)
+        }
+      })
+
+    // Track our presence
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({
+          user_id: user.id,
+          user_name: user.user_metadata?.display_name || user.email || 'Anonymous',
+          online_at: new Date().toISOString()
+        })
+      }
+    })
+
+    realtimeChannelRef.current = channel
+
+    return () => {
+      channel.unsubscribe()
+      realtimeChannelRef.current = null
+    }
+  }, [page, team, user, hasPendingSave])
+
+  // Broadcast updates when we save
+  useEffect(() => {
+    if (!lastSaved || !realtimeChannelRef.current) return
+
+    realtimeChannelRef.current.send({
+      type: 'broadcast',
+      event: 'page_updated',
+      payload: {
+        user_id: user?.id,
+        updated_at: lastSaved.toISOString()
+      }
+    })
+  }, [lastSaved, user?.id])
 
   // Sync local state with page prop changes
   useEffect(() => {
@@ -229,50 +309,46 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
       setLinkedEntityId(page.linked_entity_id)
       setShowLinkSelector(!!page.linked_entity_type)
     }
-  }, [page?.id, page?.title, page?.linked_entity_type, page?.linked_entity_id])
+  }, [page])
 
-  // Save title changes to database (metadata only, content synced via Yjs)
+  // Save title changes
   useEffect(() => {
     if (!page || !onUpdatePage) return
-    if (title === page.title) return // No change
+    if (title === page.title) return
 
-    // Debounce title updates
     const timeout = setTimeout(() => {
       onUpdatePage(page.id, { title })
     }, 1000)
 
     return () => clearTimeout(timeout)
-  }, [title, page?.id, page?.title, onUpdatePage])
+  }, [title, page, onUpdatePage])
 
-  // Save entity link changes to database (metadata only)
+  // Save entity link changes
   useEffect(() => {
     if (!page || !onUpdatePage) return
-    if (linkedEntityType === page.linked_entity_type && linkedEntityId === page.linked_entity_id) return // No change
+    if (linkedEntityType === page.linked_entity_type && linkedEntityId === page.linked_entity_id) return
 
-    // Save immediately for entity links
     onUpdatePage(page.id, {
       linked_entity_type: linkedEntityType,
       linked_entity_id: linkedEntityId
     })
-  }, [linkedEntityType, linkedEntityId, page?.id, page?.linked_entity_type, page?.linked_entity_id, onUpdatePage])
+  }, [linkedEntityType, linkedEntityId, page, onUpdatePage])
 
-  // Notify parent of sync state changes
+  // Notify parent of save state
   useEffect(() => {
     if (onSaveStateChange) {
-      onSaveStateChange({
-        isSaving: syncStatus.state === 'connecting' || syncStatus.state === 'reconnecting',
-        hasPendingSave: !syncStatus.isSynced
-      })
+      onSaveStateChange({ isSaving, hasPendingSave })
     }
-  }, [syncStatus, onSaveStateChange])
+  }, [isSaving, hasPendingSave, onSaveStateChange])
 
-  // Show loading if not ready
-  if (!editor || !initialContent) {
+  // Show loading if editor not ready or view not mounted
+  // Note: initialContent can be undefined for new pages, that's valid
+  if (!editor || !isEditorReady) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading content...</p>
+          <p className="text-muted-foreground">Loading editor...</p>
         </div>
       </div>
     )
@@ -280,6 +356,16 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
 
   return (
     <div className="flex flex-col h-full bg-background">
+      {/* Conflict Warning */}
+      {showConflictWarning && (
+        <Alert variant="destructive" className="mx-4 mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Another user just updated this page. Your changes may conflict. Consider refreshing to see their changes.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Title Header */}
       <div className="border-b bg-background sticky top-0 z-20">
         <div className="px-4 md:px-8 py-4 md:py-6">
@@ -310,44 +396,34 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                {/* Real-time Sync Status */}
-                {syncStatus.state === 'connected' && syncStatus.isSynced && (
-                  <div className="flex items-center gap-1 text-green-600">
-                    <Wifi className="w-3 h-3" />
-                    <span>Synced</span>
-                  </div>
-                )}
-                {syncStatus.state === 'connecting' && (
-                  <div className="flex items-center gap-1 text-blue-600">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Connecting...</span>
-                  </div>
-                )}
-                {syncStatus.state === 'reconnecting' && (
-                  <div className="flex items-center gap-1 text-yellow-600">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Reconnecting...</span>
-                  </div>
-                )}
-                {syncStatus.state === 'disconnected' && (
-                  <div className="flex items-center gap-1 text-gray-600">
-                    <WifiOff className="w-3 h-3" />
-                    <span>Offline</span>
-                  </div>
-                )}
-                {syncStatus.state === 'error' && (
-                  <div className="flex items-center gap-1 text-red-600">
-                    <AlertCircle className="w-3 h-3" />
-                    <span>Connection error</span>
-                  </div>
-                )}
 
-                {/* Active Editors (Collaboration) */}
+              {/* Status Bar */}
+              <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                {/* Save Status */}
+                <div className="flex items-center gap-1">
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : hasPendingSave ? (
+                    <>
+                      <Clock className="w-3 h-3" />
+                      <span>Unsaved changes</span>
+                    </>
+                  ) : lastSaved ? (
+                    <>
+                      <Save className="w-3 h-3 text-green-600" />
+                      <span className="text-green-600">Saved {lastSaved.toLocaleTimeString()}</span>
+                    </>
+                  ) : null}
+                </div>
+
+                {/* Active Editors */}
                 {activeEditors.length > 0 && (
                   <div className="flex items-center gap-1 text-blue-600">
                     <Users className="w-3 h-3" />
-                    <span>{activeEditors.length} {activeEditors.length === 1 ? 'other user' : 'others'} editing</span>
+                    <span>{activeEditors.length} {activeEditors.length === 1 ? 'other' : 'others'} viewing</span>
                   </div>
                 )}
               </div>
@@ -361,7 +437,6 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
                     onLinkChange={(type, id) => {
                       setLinkedEntityType(type)
                       setLinkedEntityId(id)
-                      // Save will be triggered by the useEffect watching these values
                     }}
                   />
                 </div>

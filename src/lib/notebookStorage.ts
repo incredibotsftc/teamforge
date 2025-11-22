@@ -107,13 +107,18 @@ export async function loadNotebookContent(
       .createSignedUrl(path, 60) // 60 second expiration
 
     if (signedUrlError) {
+      // "Object not found" is expected for new pages - return success with no blocks
+      if (signedUrlError.message?.includes('not found') || signedUrlError.message?.includes('Object not found')) {
+        console.log('[Storage] No content file found (new page)')
+        return { success: true, blocks: [] }
+      }
       console.error('[Storage] Error creating signed URL:', signedUrlError)
       return { success: false, error: signedUrlError.message }
     }
 
     if (!signedUrlData?.signedUrl) {
-      console.error('[Storage] No signed URL received')
-      return { success: false, error: 'No signed URL received' }
+      console.log('[Storage] No signed URL received (new page)')
+      return { success: true, blocks: [] }
     }
 
     // Fetch with aggressive cache-busting headers and timestamp query param
@@ -129,6 +134,11 @@ export async function loadNotebookContent(
     })
 
     if (!response.ok) {
+      // 404 is expected for new pages
+      if (response.status === 404) {
+        console.log('[Storage] Content file not found (new page)')
+        return { success: true, blocks: [] }
+      }
       console.error('[Storage] Fetch failed:', response.status, response.statusText)
       return { success: false, error: `Fetch failed: ${response.statusText}` }
     }

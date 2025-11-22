@@ -58,6 +58,7 @@ function NotebookPageContent() {
     deletePage,
     deleteFolder,
     movePageToFolder,
+    reorderPages,
     setCurrentPage,
     setCurrentFolder
   } = useNotebookContext()
@@ -118,6 +119,10 @@ function NotebookPageContent() {
 
   const handleMovePageToFolder = async (pageId: string, folderId?: string) => {
     await movePageToFolder(pageId, folderId)
+  }
+
+  const handleReorderPage = async (pageId: string, newPosition: number, folderId?: string) => {
+    await reorderPages(pageId, newPosition, folderId)
   }
 
   const handleUpdatePageMetadata = async (id: string, data: { title?: string; is_pinned?: boolean }) => {
@@ -283,6 +288,7 @@ function NotebookPageContent() {
                 onUpdatePage={handleUpdatePageMetadata}
                 onUpdateFolder={handleUpdateFolder}
                 onMovePageToFolder={handleMovePageToFolder}
+                onReorderPage={handleReorderPage}
               />
             </div>
           </>
@@ -310,6 +316,7 @@ function NotebookPageContent() {
                 onUpdatePage={handleUpdatePageMetadata}
                 onUpdateFolder={handleUpdateFolder}
                 onMovePageToFolder={handleMovePageToFolder}
+                onReorderPage={handleReorderPage}
               />
             </ResizablePanel>
             <ResizableHandle withHandle />

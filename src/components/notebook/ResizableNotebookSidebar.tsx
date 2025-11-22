@@ -17,6 +17,7 @@ interface ResizableNotebookSidebarProps {
   onUpdatePage: (id: string, data: { title?: string; is_pinned?: boolean }) => Promise<void>
   onUpdateFolder: (id: string, data: { name?: string; parent_folder_id?: string | null; color?: string }) => Promise<void>
   onMovePageToFolder: (pageId: string, folderId?: string) => Promise<void>
+  onReorderPage: (pageId: string, newPosition: number, folderId?: string) => Promise<void>
 }
 
 const MIN_WIDTH = 200

@@ -200,44 +200,6 @@ COMMENT ON TABLE "public"."vendors" IS 'Stores distinct vendors/suppliers per te
 COMMENT ON COLUMN "public"."vendors"."name" IS 'Vendor or supplier name';
 COMMENT ON COLUMN "public"."expenses"."vendor_id" IS 'Reference to vendor from vendors table';
 
--- ==============================================
--- DOWN SECTION (for future rollback capability)
--- ==============================================
--- DOWN:
-
--- Drop vendor policies
-DROP POLICY IF EXISTS "Teams can delete their own vendors" ON "public"."vendors";
-DROP POLICY IF EXISTS "Teams can update their own vendors" ON "public"."vendors";
-DROP POLICY IF EXISTS "Teams can insert their own vendors" ON "public"."vendors";
-DROP POLICY IF EXISTS "Teams can view their own vendors" ON "public"."vendors";
-
--- Drop vendor indexes
-DROP INDEX IF EXISTS "idx_expenses_vendor_id";
-DROP INDEX IF EXISTS "idx_vendors_name_search";
-DROP INDEX IF EXISTS "idx_vendors_team_id";
-
--- Drop vendor column from expenses
-ALTER TABLE "public"."expenses" DROP COLUMN IF EXISTS "vendor_id";
-
--- Drop vendors table
-DROP TABLE IF EXISTS "public"."vendors";
-
--- Drop functions
-DROP FUNCTION IF EXISTS record_version_application(VARCHAR, TEXT, TEXT);
-DROP FUNCTION IF EXISTS is_version_applied(VARCHAR);
-DROP FUNCTION IF EXISTS get_current_db_version();
-
--- Drop indexes
-DROP INDEX IF EXISTS idx_migration_history_applied_at;
-DROP INDEX IF EXISTS idx_migration_history_version;
-
--- Drop tables (cascade will remove foreign key references)
-DROP TABLE IF EXISTS migration_history CASCADE;
-DROP TABLE IF EXISTS schema_versions CASCADE;
-
--- Remove version records
-DELETE FROM schema_versions WHERE version IN ('1.0.0', '1.1.0');
-DELETE FROM migration_history WHERE version IN ('1.0.0', '1.1.0');
 
 -- ==============================================
 -- VERIFICATION SCRIPT

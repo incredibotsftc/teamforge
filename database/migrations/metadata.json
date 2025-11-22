@@ -28,7 +28,16 @@
       "verificationScript": "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'scouting_templates') AS scouting_templates_exists, EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'scouting_responses') AS scouting_responses_exists, EXISTS (SELECT FROM pg_constraint WHERE conname = 'scouting_templates_team_season_unique') AS template_unique_constraint_exists, EXISTS (SELECT FROM pg_constraint WHERE conname = 'scouting_responses_template_fkey') AS template_fkey_exists, EXISTS (SELECT FROM pg_constraint WHERE conname = 'scouting_responses_team_fkey') AS team_fkey_exists, EXISTS (SELECT FROM pg_indexes WHERE indexname = 'idx_scouting_templates_team_season') AS template_index_exists, EXISTS (SELECT FROM pg_indexes WHERE indexname = 'idx_scouting_responses_team') AS response_team_index_exists, EXISTS (SELECT FROM storage.buckets WHERE id = 'scouting-images') AS storage_bucket_exists, EXISTS (SELECT FROM public.schema_versions WHERE version = '1.2.0') AS version_recorded;",
       "estimatedTime": "45 seconds",
       "dependencies": ["1.1.0"]
+    },
+    "1.3.0": {
+      "migration": "0004_fix_sort_order.sql",
+      "releaseNotes": "/releases/v1.3.0.md",
+      "description": "Fix sort_order values and add drag-and-drop reordering for notebook pages and folders",
+      "requiresVerification": true,
+      "verificationScript": "SELECT (SELECT COUNT(*) FROM notebook_pages WHERE sort_order != 0) > 0 AS pages_sort_order_fixed, (SELECT COUNT(*) FROM notebook_folders WHERE sort_order != 0) > 0 AS folders_sort_order_fixed, EXISTS (SELECT FROM schema_versions WHERE version = '1.3.0') AS version_recorded;",
+      "estimatedTime": "5-10 seconds",
+      "dependencies": ["1.2.0"]
     }
   },
-  "versionOrder": ["1.0.0", "1.1.0", "1.2.0"]
+  "versionOrder": ["1.0.0", "1.1.0", "1.2.0", "1.3.0"]
 }

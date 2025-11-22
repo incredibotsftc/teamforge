@@ -51,6 +51,7 @@ interface NotebookSidebarProps {
   onUpdatePage: (id: string, data: { title?: string; is_pinned?: boolean }) => Promise<void>
   onUpdateFolder: (id: string, data: { name?: string; parent_folder_id?: string | null; color?: string }) => Promise<void>
   onMovePageToFolder: (pageId: string, folderId?: string) => Promise<void>
+  onReorderPage: (pageId: string, newPosition: number, folderId?: string) => Promise<void>
 }
 
 export function NotebookSidebar({
@@ -66,6 +67,7 @@ export function NotebookSidebar({
   onUpdatePage,
   onUpdateFolder,
   onMovePageToFolder,
+  onReorderPage,
 }: NotebookSidebarProps) {
   // Helper function to get all folder IDs recursively
   const getAllFolderIds = useCallback((folders: NotebookFolder[]): string[] => {
@@ -86,6 +88,7 @@ export function NotebookSidebar({
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'page' | 'folder'; id: string; name: string } | null>(null)
   const [draggedPage, setDraggedPage] = useState<NotebookPage | null>(null)
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
+  const [dropPosition, setDropPosition] = useState<{ pageId: string; position: 'before' | 'after' } | null>(null)
   const [editingFolder, setEditingFolder] = useState<NotebookFolder | null>(null)
   const [showFolderDialog, setShowFolderDialog] = useState(false)
 
@@ -95,14 +98,18 @@ export function NotebookSidebar({
     setExpandedFolders(new Set(allFolderIds))
   }, [folders, getAllFolderIds])
 
-  // Filter pages based on search
-  const filteredPages = pages.filter(page =>
-    page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    page.content_text.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Filter pages based on search and sort by sort_order
+  const filteredPages = pages
+    .filter(page =>
+      page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (page.content_text && page.content_text.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
-  // Get pages without folders (root level)
-  const rootPages = pages.filter(page => !page.folder_id)
+  // Get pages without folders (root level) sorted by sort_order
+  const rootPages = pages
+    .filter(page => !page.folder_id)
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
   // Toggle folder expansion
   const toggleFolder = (folderId: string) => {
@@ -158,11 +165,66 @@ export function NotebookSidebar({
   const handleDragEnd = () => {
     setDraggedPage(null)
     setDragOverFolder(null)
+    setDropPosition(null)
   }
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
+  }
+
+  // Handle drag over a page item for reordering
+  const handlePageDragOver = (e: React.DragEvent, page: NotebookPage) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!draggedPage || draggedPage.id === page.id) return
+
+    // Calculate if we should drop before or after based on mouse position
+    const rect = e.currentTarget.getBoundingClientRect()
+    const midPoint = rect.top + rect.height / 2
+    const position = e.clientY < midPoint ? 'before' : 'after'
+
+    setDropPosition({ pageId: page.id, position })
+    setDragOverFolder(null)
+  }
+
+  // Handle drop on a page item for reordering
+  const handlePageDrop = async (e: React.DragEvent, targetPage: NotebookPage, position: 'before' | 'after') => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!draggedPage || draggedPage.id === targetPage.id) return
+
+    try {
+      // Get all pages in the same folder
+      const pagesInSameFolder = pages
+        .filter(p => (p.folder_id || null) === (targetPage.folder_id || null))
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+
+      // Find target index
+      const targetIndex = pagesInSameFolder.findIndex(p => p.id === targetPage.id)
+      if (targetIndex === -1) return
+
+      // Calculate new position
+      let newPosition = targetIndex
+      if (position === 'after') {
+        newPosition = targetIndex + 1
+      }
+
+      // If dragging from same folder, adjust for removal
+      const draggedIndex = pagesInSameFolder.findIndex(p => p.id === draggedPage.id)
+      if (draggedIndex !== -1 && draggedIndex < newPosition) {
+        newPosition--
+      }
+
+      await onReorderPage(draggedPage.id, newPosition, targetPage.folder_id || undefined)
+    } catch (error) {
+      console.error('Error reordering page:', error)
+    } finally {
+      setDraggedPage(null)
+      setDropPosition(null)
+    }
   }
 
   const handleDragEnter = (e: React.DragEvent, folderId: string | null) => {
@@ -293,18 +355,25 @@ export function NotebookSidebar({
         </div>
 
         {/* Folder pages */}
-        {isExpanded && folder.pages && folder.pages.map(page => (
-          <div
-            key={page.id}
-            className={`flex items-center gap-1 md:gap-2 pr-2 py-2 md:py-1.5 rounded-md text-sm cursor-pointer hover:bg-accent group min-h-[44px] md:min-h-auto ${
-              currentPage?.id === page.id ? 'bg-accent' : ''
-            } ${draggedPage?.id === page.id ? 'opacity-50' : ''}`}
-            style={{ paddingLeft: `${level * 8 + 28}px`, paddingRight: '8px' }}
-            onClick={() => onSelectPage(page)}
-            draggable={true}
-            onDragStart={(e) => handleDragStart(e, page)}
-            onDragEnd={handleDragEnd}
-          >
+        {isExpanded && folder.pages && [...folder.pages].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(page => (
+          <div key={page.id} className="relative">
+            {/* Drop indicator */}
+            {dropPosition?.pageId === page.id && dropPosition.position === 'before' && (
+              <div className="h-0.5 bg-blue-500 mx-2 mb-1" style={{ marginLeft: `${level * 8 + 28}px` }} />
+            )}
+
+            <div
+              className={`flex items-center gap-1 md:gap-2 pr-2 py-2 md:py-1.5 rounded-md text-sm cursor-pointer hover:bg-accent group min-h-[44px] md:min-h-auto ${
+                currentPage?.id === page.id ? 'bg-accent' : ''
+              } ${draggedPage?.id === page.id ? 'opacity-50' : ''}`}
+              style={{ paddingLeft: `${level * 8 + 28}px`, paddingRight: '8px' }}
+              onClick={() => onSelectPage(page)}
+              draggable={true}
+              onDragStart={(e) => handleDragStart(e, page)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(e) => handlePageDragOver(e, page)}
+              onDrop={(e) => handlePageDrop(e, page, dropPosition?.position || 'after')}
+            >
             <GripVertical className="w-3 h-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 flex-shrink-0 cursor-grab" />
             <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
 
@@ -359,6 +428,12 @@ export function NotebookSidebar({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {/* Drop indicator after */}
+          {dropPosition?.pageId === page.id && dropPosition.position === 'after' && (
+            <div className="h-0.5 bg-blue-500 mx-2 mt-1" style={{ marginLeft: `${level * 8 + 28}px` }} />
+          )}
+        </div>
         ))}
 
         {/* Subfolders */}
@@ -398,17 +473,24 @@ export function NotebookSidebar({
               Search Results ({filteredPages.length})
             </div>
             {filteredPages.map(page => (
-              <div
-                key={page.id}
-                className={`flex items-center gap-1 md:gap-2 pr-2 py-2 md:py-1.5 rounded-md text-sm cursor-pointer hover:bg-accent min-h-[44px] md:min-h-auto ${
-                  currentPage?.id === page.id ? 'bg-accent' : ''
-                } ${draggedPage?.id === page.id ? 'opacity-50' : ''}`}
-                style={{ paddingLeft: '4px', paddingRight: '8px' }}
-                onClick={() => onSelectPage(page)}
-                draggable={true}
-                onDragStart={(e) => handleDragStart(e, page)}
-                onDragEnd={handleDragEnd}
-              >
+              <div key={page.id} className="relative">
+                {/* Drop indicator */}
+                {dropPosition?.pageId === page.id && dropPosition.position === 'before' && (
+                  <div className="h-0.5 bg-blue-500 mx-2 mb-1" />
+                )}
+
+                <div
+                  className={`flex items-center gap-1 md:gap-2 pr-2 py-2 md:py-1.5 rounded-md text-sm cursor-pointer hover:bg-accent min-h-[44px] md:min-h-auto ${
+                    currentPage?.id === page.id ? 'bg-accent' : ''
+                  } ${draggedPage?.id === page.id ? 'opacity-50' : ''}`}
+                  style={{ paddingLeft: '4px', paddingRight: '8px' }}
+                  onClick={() => onSelectPage(page)}
+                  draggable={true}
+                  onDragStart={(e) => handleDragStart(e, page)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => handlePageDragOver(e, page)}
+                  onDrop={(e) => handlePageDrop(e, page, dropPosition?.position || 'after')}
+                >
                 <GripVertical className="w-3 h-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 flex-shrink-0 cursor-grab" />
                 <FileText className="w-4 h-4 text-muted-foreground" />
                 <Tooltip>
@@ -420,6 +502,12 @@ export function NotebookSidebar({
                   </TooltipContent>
                 </Tooltip>
               </div>
+
+              {/* Drop indicator after */}
+              {dropPosition?.pageId === page.id && dropPosition.position === 'after' && (
+                <div className="h-0.5 bg-blue-500 mx-2 mt-1" />
+              )}
+            </div>
             ))}
           </div>
         ) : (
@@ -443,17 +531,24 @@ export function NotebookSidebar({
                   {rootPages.length > 0 ? 'Uncategorized' : 'Drop here to remove from folder'}
                 </div>
                 {rootPages.map(page => (
-                  <div
-                    key={page.id}
-                    className={`flex items-center gap-1 md:gap-2 pr-2 py-2 md:py-1.5 rounded-md text-sm cursor-pointer hover:bg-accent group min-h-[44px] md:min-h-auto ${
-                      currentPage?.id === page.id ? 'bg-accent' : ''
-                    } ${draggedPage?.id === page.id ? 'opacity-50' : ''}`}
-                    style={{ paddingLeft: '4px', paddingRight: '8px' }}
-                    onClick={() => onSelectPage(page)}
-                    draggable={true}
-                    onDragStart={(e) => handleDragStart(e, page)}
-                    onDragEnd={handleDragEnd}
-                  >
+                  <div key={page.id} className="relative">
+                    {/* Drop indicator */}
+                    {dropPosition?.pageId === page.id && dropPosition.position === 'before' && (
+                      <div className="h-0.5 bg-blue-500 mx-2 mb-1" />
+                    )}
+
+                    <div
+                      className={`flex items-center gap-1 md:gap-2 pr-2 py-2 md:py-1.5 rounded-md text-sm cursor-pointer hover:bg-accent group min-h-[44px] md:min-h-auto ${
+                        currentPage?.id === page.id ? 'bg-accent' : ''
+                      } ${draggedPage?.id === page.id ? 'opacity-50' : ''}`}
+                      style={{ paddingLeft: '4px', paddingRight: '8px' }}
+                      onClick={() => onSelectPage(page)}
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, page)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={(e) => handlePageDragOver(e, page)}
+                      onDrop={(e) => handlePageDrop(e, page, dropPosition?.position || 'after')}
+                    >
                     <GripVertical className="w-3 h-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 flex-shrink-0 cursor-grab" />
                     <FileText className="w-4 h-4 text-muted-foreground" />
 
@@ -508,6 +603,12 @@ export function NotebookSidebar({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+
+                  {/* Drop indicator after */}
+                  {dropPosition?.pageId === page.id && dropPosition.position === 'after' && (
+                    <div className="h-0.5 bg-blue-500 mx-2 mt-1" />
+                  )}
+                </div>
                 ))}
               </>
             )}
