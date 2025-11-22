@@ -139,13 +139,14 @@ export function useCollaborativeNotebook(
           }
         })
 
-        if (mounted) {
+        if (mounted && yjsProvider) {
+          const connectionState = yjsProvider.getConnectionState()
           setDoc(yjsDoc)
           setProvider(yjsProvider)
           setIsLoaded(true)
           setSyncStatus(prev => ({
             ...prev,
-            state: yjsProvider.getConnectionState()
+            state: connectionState
           }))
         }
 
