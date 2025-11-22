@@ -160,13 +160,19 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
     loadPageContent()
   }, [page?.id, team?.id, currentSeason?.id, isLoaded])
 
-  // Create BlockNote editor instance
-  // Note: Full Yjs collaboration will be added in Phase 2
-  // For now, we use reliable snapshot-based autosave
+  // Create BlockNote editor instance with Yjs collaboration
   const editor = useCreateBlockNote({
     initialContent: initialContent,
-    uploadFile: handleUploadFile
-  }, [initialContent])
+    uploadFile: handleUploadFile,
+    collaboration: doc && provider ? {
+      provider: provider as any, // SupabaseYjsProvider implements Yjs provider interface
+      fragment: doc.getXmlFragment('blocknote'),
+      user: {
+        name: yjsConfig?.user.name || 'Anonymous',
+        color: yjsConfig?.user.color || '#6366f1'
+      }
+    } : undefined
+  }, [initialContent, doc, provider])
 
   // Store editor ref for callbacks
   useEffect(() => {
@@ -265,23 +271,43 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
                 )}
               </div>
               <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                {/* Autosave Status */}
-                {syncStatus.isSynced && (
+                {/* Real-time Sync Status */}
+                {syncStatus.state === 'connected' && syncStatus.isSynced && (
                   <div className="flex items-center gap-1 text-green-600">
-                    <Check className="w-3 h-3" />
-                    <span>Auto-saved</span>
+                    <Wifi className="w-3 h-3" />
+                    <span>Synced</span>
                   </div>
                 )}
-                {!syncStatus.isSynced && syncStatus.state !== 'error' && (
+                {syncStatus.state === 'connecting' && (
                   <div className="flex items-center gap-1 text-blue-600">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Saving...</span>
+                    <span>Connecting...</span>
+                  </div>
+                )}
+                {syncStatus.state === 'reconnecting' && (
+                  <div className="flex items-center gap-1 text-yellow-600">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Reconnecting...</span>
+                  </div>
+                )}
+                {syncStatus.state === 'disconnected' && (
+                  <div className="flex items-center gap-1 text-gray-600">
+                    <WifiOff className="w-3 h-3" />
+                    <span>Offline</span>
                   </div>
                 )}
                 {syncStatus.state === 'error' && (
                   <div className="flex items-center gap-1 text-red-600">
                     <AlertCircle className="w-3 h-3" />
-                    <span>Save error - will retry</span>
+                    <span>Connection error</span>
+                  </div>
+                )}
+
+                {/* Active Editors (Collaboration) */}
+                {activeEditors.length > 0 && (
+                  <div className="flex items-center gap-1 text-blue-600">
+                    <Users className="w-3 h-3" />
+                    <span>{activeEditors.length} {activeEditors.length === 1 ? 'other user' : 'others'} editing</span>
                   </div>
                 )}
               </div>

@@ -3,6 +3,8 @@
  *
  * This provider uses Supabase Realtime Broadcast channels to sync Yjs updates
  * between clients, enabling real-time collaborative editing.
+ *
+ * Implements the standard Yjs provider interface for BlockNote compatibility.
  */
 
 import * as Y from 'yjs'
@@ -18,7 +20,7 @@ import type {
   AwarenessUpdateMessage
 } from './types'
 
-export class SupabaseYjsProvider {
+export class SupabaseYjsProvider extends EventTarget {
   private channel: RealtimeChannel | null = null
   public awareness: awarenessProtocol.Awareness
   private doc: Y.Doc
@@ -40,6 +42,7 @@ export class SupabaseYjsProvider {
     doc: Y.Doc,
     config: RealtimeChannelConfig
   ) {
+    super() // Required for EventTarget
     this.doc = doc
     this.config = config
     this.roomName = `notebook:team:${config.teamId}:page:${config.pageId}`
