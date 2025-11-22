@@ -7,7 +7,7 @@ import '@blocknote/core/fonts/inter.css'
 import '@blocknote/mantine/style.css'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { FileText, Loader2, Check, Link2, Calendar, Users, FolderKanban, AlertCircle } from 'lucide-react'
+import { FileText, Loader2, Check, Link2, Calendar, Users, FolderKanban, AlertCircle, Wifi, WifiOff } from 'lucide-react'
 import { NotebookPage, LinkedEntityType } from '@/types/notebook'
 import { EntityLinkSelector } from './EntityLinkSelector'
 import { supabase } from '@/lib/supabase'
@@ -15,9 +15,9 @@ import { loadNotebookContent } from '@/lib/notebookStorage'
 import { useAppData } from '@/components/AppDataProvider'
 import { useAuth } from '@/components/AuthProvider'
 import { useTheme } from '@/components/ThemeProvider'
-import { useNotebookSave } from '@/hooks/useNotebookSave'
+import { useCollaborativeNotebook } from '@/hooks/useCollaborativeNotebook'
 import type { Block } from '@blocknote/core'
-import { useDebouncedCallback } from 'use-debounce'
+import type { CollaborativeNotebookConfig } from '@/lib/yjs/types'
 
 interface BlockNoteEditorProps {
   page?: NotebookPage
@@ -31,26 +31,54 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
   const { resolvedTheme } = useTheme()
   const [title, setTitle] = useState('Untitled')
 
-  const [initialContent, setInitialContent] = useState<{ pageId: string; blocks: Block[]; sequence: number } | "loading">("loading")
+  const [initialContent, setInitialContent] = useState<Block[] | undefined>(undefined)
   const [linkedEntityType, setLinkedEntityType] = useState<LinkedEntityType | undefined>(page?.linked_entity_type)
   const [linkedEntityId, setLinkedEntityId] = useState<string | undefined>(page?.linked_entity_id)
   const [showLinkSelector, setShowLinkSelector] = useState(false)
 
-  // TanStack Query mutation for saving
-  const { mutate: saveNotebook, isPending: isSaving, isSuccess, isError } = useNotebookSave(onUpdatePage, page)
-
   // Track refs
-  const currentPageIdRef = useRef<string | undefined>(undefined)
-  const editorPageIdRef = useRef<string | undefined>(undefined)
-  const loadingSequenceRef = useRef<number>(0)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const isEditingTitleRef = useRef(false)
-  const lastSavedTitleRef = useRef<string>('')
-  const lastSavedEntityTypeRef = useRef<LinkedEntityType | undefined>(undefined)
-  const lastSavedEntityIdRef = useRef<string | undefined>(undefined)
 
-  // Track if there's a pending debounced save
-  const [hasPendingSave, setHasPendingSave] = useState(false)
+  // Yjs collaborative editing configuration
+  const yjsConfig = useMemo<CollaborativeNotebookConfig | null>(() => {
+    if (!page || !team || !currentSeason || !user) {
+      return null
+    }
+
+    // Generate a consistent color for this user
+    const userColor = user.user_metadata?.accent_color || '#6366f1'
+
+    return {
+      pageId: page.id,
+      teamId: team.id,
+      seasonId: currentSeason.id,
+      user: {
+        id: user.id,
+        name: user.user_metadata?.display_name || user.email || 'Anonymous',
+        email: user.email,
+        color: userColor
+      },
+      enablePresence: true,
+      enableVersionHistory: false, // TODO: Implement later
+      snapshotInterval: 30000 // 30 seconds
+    }
+  }, [page?.id, team?.id, currentSeason?.id, user?.id])
+
+  // Ref to store editor instance for callbacks
+  const editorRef = useRef<ReturnType<typeof useCreateBlockNote> | null>(null)
+
+  // Get current blocks function for snapshots
+  const getCurrentBlocks = useCallback((): Block[] => {
+    if (!editorRef.current) return []
+    return editorRef.current.document
+  }, [])
+
+  // Use collaborative notebook hook
+  const { doc, provider, isLoaded, syncStatus, activeEditors, saveSnapshot } = useCollaborativeNotebook(
+    yjsConfig,
+    getCurrentBlocks
+  )
 
   // Image upload handler
   const handleUploadFile = useCallback(async (file: File): Promise<string> => {
@@ -87,48 +115,27 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
 
   // Load content when page changes
   useEffect(() => {
-    if (!page || !team || !currentSeason) {
-      setInitialContent("loading")
-      editorPageIdRef.current = undefined // Invalidate old editor
-      return
-    }
-
-    // CRITICAL: Only reload if the page ID actually changed
-    // Don't reload if just title/metadata changed
-    if (editorPageIdRef.current === page.id) {
+    if (!page || !team || !currentSeason || !isLoaded) {
+      setInitialContent(undefined)
       return
     }
 
     const loadPageContent = async () => {
-      // CRITICAL: Increment sequence number for this load
-      loadingSequenceRef.current += 1
-      const thisLoadSequence = loadingSequenceRef.current
-
-      // CRITICAL: Clear the editor page ID immediately to invalidate any old editor instances
-      // This ensures old onChange handlers will be blocked
-      editorPageIdRef.current = undefined
-
-      setInitialContent("loading")
-
       let loadedBlocks: Block[] | undefined
 
       try {
-        // ALWAYS load from Supabase Storage on mount to ensure we have the latest data
-        // Try to load from Supabase Storage first
+        // Load from Supabase Storage
         if (page.content_path) {
           const result = await loadNotebookContent(team.id, currentSeason.id, page.id)
           if (result.success && result.blocks) {
             loadedBlocks = result.blocks
           }
         }
-        // FALLBACK: If content exists in DB (legacy), use it
+        // FALLBACK: Legacy content from DB
         else if (page.content) {
-          // If content is already an array (BlockNote format), use it
           if (Array.isArray(page.content)) {
             loadedBlocks = page.content as Block[]
-          }
-          // If content is a stringified array, parse it
-          else if (typeof page.content === 'string') {
+          } else if (typeof page.content === 'string') {
             try {
               const parsed = JSON.parse(page.content)
               if (Array.isArray(parsed)) {
@@ -143,183 +150,88 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
         console.error('[Editor] Error loading content:', error)
       }
 
-      // Set the initial content for editor creation
       const blocksToLoad = loadedBlocks && loadedBlocks.length > 0
         ? loadedBlocks
         : [{ type: 'paragraph', content: [] }] as unknown as Block[]
 
-      // CRITICAL: Only set content if this is still the latest load
-      if (thisLoadSequence !== loadingSequenceRef.current) {
-        return
-      }
-
-      // CRITICAL: Mark which page this editor instance will be for
-      editorPageIdRef.current = page.id
-
-      // Set initial content with page ID and sequence to prevent race conditions
-      setInitialContent({ pageId: page.id, blocks: blocksToLoad, sequence: thisLoadSequence })
+      setInitialContent(blocksToLoad)
     }
 
     loadPageContent()
-  }, [page, team, currentSeason])
+  }, [page?.id, team?.id, currentSeason?.id, isLoaded])
 
-  // Create BlockNote editor instance - recreated when initialContent changes
-  const editorInitialContent = useMemo(() => {
-    if (initialContent === "loading") {
-      return undefined
-    }
-
-    return initialContent.blocks
-  }, [initialContent])
-
+  //Create BlockNote editor instance with Yjs collaboration
   const editor = useCreateBlockNote({
-    initialContent: editorInitialContent,
+    initialContent: initialContent,
     uploadFile: handleUploadFile,
-  }, [editorInitialContent])
-
-  // Debounced save function using TanStack Query mutation
-  const debouncedSave = useDebouncedCallback(
-    (pageId: string, blocks: Block[], metadata?: { title?: string; linked_entity_type?: LinkedEntityType; linked_entity_id?: string }) => {
-      if (!team || !currentSeason) {
-        setHasPendingSave(false)
-        return
+    collaboration: doc && provider ? {
+      provider: provider as unknown as Parameters<typeof useCreateBlockNote>[0]['collaboration']['provider'],
+      fragment: doc.getXmlFragment('blocknote'),
+      user: {
+        name: yjsConfig?.user.name || 'Anonymous',
+        color: yjsConfig?.user.color || '#6366f1'
       }
+    } : undefined
+  }, [doc, provider, initialContent])
 
-      setHasPendingSave(false) // Clear pending flag when save actually fires
-
-      saveNotebook({
-        pageId,
-        teamId: team.id,
-        seasonId: currentSeason.id,
-        blocks,
-        userId: user?.id,
-        metadata
-      })
-    },
-    // 2 second debounce - TanStack Query will handle queuing and retry
-    2000,
-    { leading: false, trailing: true }
-  )
-
-  // Sync local state with page prop changes (ONLY when page ID changes)
+  // Store editor ref for callbacks
   useEffect(() => {
-    // Page has changed - flush any pending debounced saves
-    if (editor && currentPageIdRef.current && currentPageIdRef.current !== page?.id) {
-      debouncedSave.flush() // Force immediate execution of pending debounced saves
-    }
+    editorRef.current = editor
+  }, [editor])
 
-    // Update the current page ref immediately
-    currentPageIdRef.current = page?.id
-
-    // Update state for the new page
+  // Sync local state with page prop changes
+  useEffect(() => {
     if (page) {
-      const newTitle = page.title || 'Untitled'
-      setTitle(newTitle)
+      setTitle(page.title || 'Untitled')
       setLinkedEntityType(page.linked_entity_type)
       setLinkedEntityId(page.linked_entity_id)
       setShowLinkSelector(!!page.linked_entity_type)
-
-      // Initialize the "last saved" refs to prevent immediate save on page load
-      lastSavedTitleRef.current = newTitle
-      lastSavedEntityTypeRef.current = page.linked_entity_type
-      lastSavedEntityIdRef.current = page.linked_entity_id
     }
-    // IMPORTANT: Only depend on page.id, not title/metadata
-    // This prevents circular updates when save updates the page prop
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page?.id, editor, debouncedSave])
+  }, [page?.id, page?.title, page?.linked_entity_type, page?.linked_entity_id])
 
-  // Auto-save content changes with debouncing
+  // Save title changes to database (metadata only, content synced via Yjs)
   useEffect(() => {
-    // Only save if we have a valid page, editor is ready, and initialContent is loaded
-    if (!page || !page.id || !editor || initialContent === "loading") {
-      return
-    }
+    if (!page || !onUpdatePage) return
+    if (title === page.title) return // No change
 
-    // Capture the page ID this editor instance belongs to
-    const editorPageId = editorPageIdRef.current
+    // Debounce title updates
+    const timeout = setTimeout(() => {
+      onUpdatePage(page.id, { title })
+    }, 1000)
 
-    // Set up onChange listener
-    const unsubscribeOnChange = editor.onChange(() => {
-      // Verify this editor instance belongs to the current page
-      if (editorPageId !== editorPageIdRef.current || editorPageId !== currentPageIdRef.current) {
-        return
-      }
+    return () => clearTimeout(timeout)
+  }, [title, page?.id, page?.title, onUpdatePage])
 
-      // Mark that we have a pending save
-      setHasPendingSave(true)
-
-      // Capture current blocks and trigger debounced save
-      const blocksToSave = editor.document
-      debouncedSave(page.id, blocksToSave, {
-        title,
-        linked_entity_type: linkedEntityType,
-        linked_entity_id: linkedEntityId
-      })
-    })
-
-    return () => {
-      unsubscribeOnChange()
-    }
-  }, [page, initialContent, editor, debouncedSave, title, linkedEntityType, linkedEntityId])
-
-  // Save when title changes (only if it's different from what was last saved)
+  // Save entity link changes to database (metadata only)
   useEffect(() => {
-    if (!page || !page.id || !editor || initialContent === "loading") return
-    if (title === lastSavedTitleRef.current) return
+    if (!page || !onUpdatePage) return
+    if (linkedEntityType === page.linked_entity_type && linkedEntityId === page.linked_entity_id) return // No change
 
-    lastSavedTitleRef.current = title
-    setHasPendingSave(true)
-    debouncedSave(page.id, editor.document, {
-      title,
+    // Save immediately for entity links
+    onUpdatePage(page.id, {
       linked_entity_type: linkedEntityType,
       linked_entity_id: linkedEntityId
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, page?.id, editor, initialContent, debouncedSave, linkedEntityType, linkedEntityId])
+  }, [linkedEntityType, linkedEntityId, page?.id, page?.linked_entity_type, page?.linked_entity_id, onUpdatePage])
 
-  // Save when entity links change (only if different from what was last saved)
-  useEffect(() => {
-    if (!page || !page.id || !editor || initialContent === "loading") return
-    if (linkedEntityType === lastSavedEntityTypeRef.current && linkedEntityId === lastSavedEntityIdRef.current) return
-
-    lastSavedEntityTypeRef.current = linkedEntityType
-    lastSavedEntityIdRef.current = linkedEntityId
-    setHasPendingSave(true)
-    debouncedSave(page.id, editor.document, {
-      title,
-      linked_entity_type: linkedEntityType,
-      linked_entity_id: linkedEntityId
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkedEntityType, linkedEntityId, page?.id, editor, initialContent, debouncedSave, title])
-
-  // Flush pending saves on unmount
-  useEffect(() => {
-    return () => {
-      debouncedSave.flush()
-    }
-  }, [debouncedSave])
-
-  // Notify parent of save state changes
+  // Notify parent of sync state changes
   useEffect(() => {
     if (onSaveStateChange) {
-      onSaveStateChange({ isSaving, hasPendingSave })
+      onSaveStateChange({
+        isSaving: syncStatus.state === 'connecting' || syncStatus.state === 'reconnecting',
+        hasPendingSave: !syncStatus.isSynced
+      })
     }
-  }, [isSaving, hasPendingSave, onSaveStateChange])
+  }, [syncStatus, onSaveStateChange])
 
-  // Show loading if editor isn't ready OR if we don't have valid content for the current page
-  const isContentReady = initialContent !== "loading" &&
-                         page?.id !== undefined &&
-                         initialContent.pageId === page.id
-
-  if (!editor || !isContentReady) {
+  // Show loading if not ready
+  if (!editor || !isLoaded || !initialContent) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">
-            {!isContentReady ? 'Loading content...' : 'Preparing editor...'}
+            {!isLoaded ? 'Connecting...' : 'Loading content...'}
           </p>
         </div>
       </div>
@@ -359,22 +271,43 @@ export function BlockNoteEditor({ page, onUpdatePage, onSaveStateChange }: Block
                 )}
               </div>
               <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                {(isSaving || hasPendingSave) && (
+                {/* Sync Status */}
+                {syncStatus.state === 'connected' && syncStatus.isSynced && (
+                  <div className="flex items-center gap-1 text-green-600">
+                    <Wifi className="w-3 h-3" />
+                    <span>Synced</span>
+                  </div>
+                )}
+                {syncStatus.state === 'connecting' && (
                   <div className="flex items-center gap-1 text-blue-600">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Saving...</span>
+                    <span>Connecting...</span>
                   </div>
                 )}
-                {isSuccess && !isSaving && !hasPendingSave && (
-                  <div className="flex items-center gap-1 text-green-600">
-                    <Check className="w-3 h-3" />
-                    <span>Saved</span>
+                {syncStatus.state === 'reconnecting' && (
+                  <div className="flex items-center gap-1 text-yellow-600">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Reconnecting...</span>
                   </div>
                 )}
-                {isError && !isSaving && !hasPendingSave && (
+                {syncStatus.state === 'disconnected' && (
+                  <div className="flex items-center gap-1 text-gray-600">
+                    <WifiOff className="w-3 h-3" />
+                    <span>Offline</span>
+                  </div>
+                )}
+                {syncStatus.state === 'error' && (
                   <div className="flex items-center gap-1 text-red-600">
                     <AlertCircle className="w-3 h-3" />
-                    <span>Save failed - will retry</span>
+                    <span>Sync error</span>
+                  </div>
+                )}
+
+                {/* Active Editors */}
+                {activeEditors.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    <Users className="w-3 h-3" />
+                    <span>{activeEditors.length} {activeEditors.length === 1 ? 'other' : 'others'} editing</span>
                   </div>
                 )}
               </div>
