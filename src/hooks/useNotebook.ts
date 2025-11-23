@@ -420,7 +420,7 @@ export function useNotebook() {
 
         // Get pages in the TARGET folder
         const pagesInTargetFolder = prev.pages
-          .filter(p => (p.folder_id || null) === (folderId || null))
+          .filter(p => (p.folder_id || undefined) === (folderId || undefined))
           .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
         // Calculate new ordering
@@ -438,7 +438,7 @@ export function useNotebook() {
             {
               ...p,
               sort_order: index,
-              folder_id: p.id === pageId ? (folderId || null) : p.folder_id
+              folder_id: p.id === pageId ? (folderId || undefined) : p.folder_id
             }
           ])
         )
