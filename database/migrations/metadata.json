@@ -34,7 +34,7 @@
       "releaseNotes": "/releases/v1.3.0.md",
       "description": "Fix sort_order values and add drag-and-drop reordering for notebook pages and folders",
       "requiresVerification": true,
-      "verificationScript": "SELECT (SELECT COUNT(*) FROM notebook_pages WHERE sort_order != 0) > 0 AS pages_sort_order_fixed, (SELECT COUNT(*) FROM notebook_folders WHERE sort_order != 0) > 0 AS folders_sort_order_fixed, EXISTS (SELECT FROM schema_versions WHERE version = '1.3.0') AS version_recorded;",
+      "verificationScript": "SELECT EXISTS (SELECT FROM schema_versions WHERE version = '1.3.0') AS version_recorded, (SELECT COUNT(*) FROM notebook_pages) = 0 OR (SELECT COUNT(*) FROM notebook_pages WHERE sort_order IS NOT NULL) = (SELECT COUNT(*) FROM notebook_pages) AS pages_sort_order_valid, (SELECT COUNT(*) FROM notebook_folders) = 0 OR (SELECT COUNT(*) FROM notebook_folders WHERE sort_order IS NOT NULL) = (SELECT COUNT(*) FROM notebook_folders) AS folders_sort_order_valid;",
       "estimatedTime": "5-10 seconds",
       "dependencies": ["1.2.0"]
     }

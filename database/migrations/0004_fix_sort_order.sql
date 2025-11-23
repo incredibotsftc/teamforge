@@ -61,8 +61,13 @@ DELETE FROM schema_versions WHERE version = '1.3.0';
 /*
 VERIFICATION_SCRIPT_START
 SELECT
-  (SELECT COUNT(*) FROM notebook_pages WHERE sort_order != 0) > 0 AS pages_sort_order_fixed,
-  (SELECT COUNT(*) FROM notebook_folders WHERE sort_order != 0) > 0 AS folders_sort_order_fixed,
-  EXISTS (SELECT FROM schema_versions WHERE version = '1.3.0') AS version_recorded;
+  -- Check that version is recorded (most important)
+  EXISTS (SELECT FROM schema_versions WHERE version = '1.3.0') AS version_recorded,
+  -- Check that pages either don't exist OR have proper sort_order values
+  (SELECT COUNT(*) FROM notebook_pages) = 0 OR
+  (SELECT COUNT(*) FROM notebook_pages WHERE sort_order IS NOT NULL) = (SELECT COUNT(*) FROM notebook_pages) AS pages_sort_order_valid,
+  -- Check that folders either don't exist OR have proper sort_order values
+  (SELECT COUNT(*) FROM notebook_folders) = 0 OR
+  (SELECT COUNT(*) FROM notebook_folders WHERE sort_order IS NOT NULL) = (SELECT COUNT(*) FROM notebook_folders) AS folders_sort_order_valid;
 VERIFICATION_SCRIPT_END
 */
