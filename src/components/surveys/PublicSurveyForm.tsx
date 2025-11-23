@@ -34,9 +34,14 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
   const loadSurvey = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/surveys/${surveyId}`)
+      const response = await fetch(`/api/public/surveys/${surveyId}`)
       if (!response.ok) {
-        throw new Error('Survey not found')
+        if (response.status === 403) {
+          setError('This survey is not currently available')
+        } else {
+          setError('Survey not found')
+        }
+        return
       }
       const { survey: loadedSurvey } = await response.json()
       setSurvey(loadedSurvey)
@@ -68,7 +73,7 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
         ...answer
       }))
 
-      const response = await fetch(`/api/surveys/${surveyId}/responses`, {
+      const response = await fetch(`/api/public/surveys/${surveyId}/responses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -101,10 +106,10 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
     )
   }
 
-  if (!survey || survey.status !== 'published') {
+  if (error || !survey) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">This survey is not currently available.</p>
+        <p className="text-muted-foreground">{error || 'This survey is not currently available.'}</p>
       </div>
     )
   }
