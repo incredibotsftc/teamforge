@@ -37,7 +37,16 @@
       "verificationScript": "SELECT EXISTS (SELECT FROM schema_versions WHERE version = '1.3.0') AS version_recorded, (SELECT COUNT(*) FROM notebook_pages) = 0 OR (SELECT COUNT(*) FROM notebook_pages WHERE sort_order IS NOT NULL) = (SELECT COUNT(*) FROM notebook_pages) AS pages_sort_order_valid, (SELECT COUNT(*) FROM notebook_folders) = 0 OR (SELECT COUNT(*) FROM notebook_folders WHERE sort_order IS NOT NULL) = (SELECT COUNT(*) FROM notebook_folders) AS folders_sort_order_valid;",
       "estimatedTime": "5-10 seconds",
       "dependencies": ["1.2.0"]
+    },
+    "1.4.0": {
+      "migration": "0005_add_surveys.sql",
+      "releaseNotes": "/releases/v1.4.0.md",
+      "description": "Add surveys feature with public response collection and analytics",
+      "requiresVerification": true,
+      "verificationScript": "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'surveys') AS surveys_exists, EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'survey_questions') AS survey_questions_exists, EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'survey_responses') AS survey_responses_exists, EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'survey_answers') AS survey_answers_exists, EXISTS (SELECT FROM pg_constraint WHERE conname = 'surveys_team_fkey') AS surveys_team_fkey_exists, EXISTS (SELECT FROM pg_constraint WHERE conname = 'survey_questions_survey_fkey') AS questions_survey_fkey_exists, EXISTS (SELECT FROM pg_constraint WHERE conname = 'survey_responses_survey_fkey') AS responses_survey_fkey_exists, EXISTS (SELECT FROM pg_constraint WHERE conname = 'survey_answers_response_fkey') AS answers_response_fkey_exists, EXISTS (SELECT FROM pg_indexes WHERE indexname = 'idx_surveys_team_season') AS surveys_team_season_index_exists, EXISTS (SELECT FROM pg_indexes WHERE indexname = 'idx_survey_questions_survey') AS questions_survey_index_exists, EXISTS (SELECT FROM pg_policies WHERE tablename = 'surveys' AND policyname = 'Team members can view their team''s surveys') AS surveys_select_policy_exists, EXISTS (SELECT FROM pg_policies WHERE tablename = 'survey_responses' AND policyname = 'Anyone can submit responses to published surveys') AS public_submit_policy_exists, EXISTS (SELECT FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid WHERE n.nspname = 'public' AND p.proname = 'get_surveys_with_question_count') AS helper_function_exists, EXISTS (SELECT FROM public.schema_versions WHERE version = '1.4.0') AS version_recorded;",
+      "estimatedTime": "1 minute",
+      "dependencies": ["1.3.0"]
     }
   },
-  "versionOrder": ["1.0.0", "1.1.0", "1.2.0", "1.3.0"]
+  "versionOrder": ["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"]
 }
