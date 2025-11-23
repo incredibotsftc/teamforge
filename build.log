@@ -1,0 +1,45 @@
+
+> ftc-teamforge@1.2.0 build
+> next build --turbopack
+
+   ▲ Next.js 15.5.4 (Turbopack)
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Finished writing to disk in 443ms
+ ✓ Compiled successfully in 32.0s
+   Linting and checking validity of types ...
+
+Failed to compile.
+
+./src/app/notebook/[noteId]/page.tsx
+252:6  Warning: React Hook useMemo has a missing dependency: 'currentPage?.folder_id'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/notebook/BlockNoteEditor.tsx
+124:16  Warning: 'error' is defined but never used.  @typescript-eslint/no-unused-vars
+139:6  Warning: React Hook useEffect has missing dependencies: 'currentSeason', 'page', and 'team'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+225:28  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+226:25  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+233:54  Warning: 'payload' is defined but never used.  @typescript-eslint/no-unused-vars
+262:6  Warning: React Hook useEffect has missing dependencies: 'page', 'team', and 'user'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+286:6  Warning: React Hook useEffect has a missing dependency: 'page'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+298:6  Warning: React Hook useEffect has a missing dependency: 'page'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+309:6  Warning: React Hook useEffect has a missing dependency: 'page'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/lib/notebookStorage.ts
+253:8  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/lib/yjs/notebookSync.ts
+40:13  Warning: 'fragment' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+94:11  Warning: 'snapshot' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+136:41  Warning: 'doc' is defined but never used.  @typescript-eslint/no-unused-vars
+158:3  Warning: 'teamId' is defined but never used.  @typescript-eslint/no-unused-vars
+159:3  Warning: 'seasonId' is defined but never used.  @typescript-eslint/no-unused-vars
+160:3  Warning: 'pageId' is defined but never used.  @typescript-eslint/no-unused-vars
+180:3  Warning: 'teamId' is defined but never used.  @typescript-eslint/no-unused-vars
+181:3  Warning: 'seasonId' is defined but never used.  @typescript-eslint/no-unused-vars
+182:3  Warning: 'pageId' is defined but never used.  @typescript-eslint/no-unused-vars
+183:3  Warning: 'version' is defined but never used.  @typescript-eslint/no-unused-vars
+234:3  Warning: 'keepVersions' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules

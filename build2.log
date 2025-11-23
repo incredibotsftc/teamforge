@@ -1,0 +1,27 @@
+
+> ftc-teamforge@1.2.0 build
+> next build --turbopack
+
+   ▲ Next.js 15.5.4 (Turbopack)
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Finished writing to disk in 690ms
+ ✓ Compiled successfully in 34.0s
+   Linting and checking validity of types ...
+Failed to compile.
+
+./src/components/notebook/BlockNoteEditor.tsx:119:29
+Type error: Conversion of type '{ type: "paragraph"; content: string; }[]' to type 'Block[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ type: "paragraph"; content: string; }' is not comparable to type 'Block'.
+    Types of property 'content' are incompatible.
+      Type 'string' is not comparable to type '(Link<StyleSchemaFromSpecs<{ bold: { config: { type: string; propSchema: "boolean"; }; implementation: StyleImplementation<{ type: string; propSchema: "boolean"; }>; }; italic: { config: { type: string; propSchema: "boolean"; }; implementation: StyleImplementation<...>; }; ... 4 more ...; backgroundColor: StyleSpec<...'.
+
+[0m [90m 117 |[39m           [90m// New page or empty content[39m
+ [90m 118 |[39m           console[33m.[39mlog([32m'[Editor] No saved content, starting with empty paragraph'[39m)
+[31m[1m>[22m[39m[90m 119 |[39m           setInitialContent([{
+ [90m     |[39m                             [31m[1m^[22m[39m
+ [90m 120 |[39m             type[33m:[39m [32m'paragraph'[39m[33m,[39m
+ [90m 121 |[39m             content[33m:[39m [32m''[39m
+ [90m 122 |[39m           }] [36mas[39m [33mBlock[39m[])[0m
+Next.js build worker exited with code: 1 and signal: null
