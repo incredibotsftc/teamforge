@@ -17,13 +17,20 @@ interface QuestionEditorProps {
     is_required: boolean
   }) => void
   onCancel: () => void
+  initialData?: {
+    question_text: string
+    question_type: QuestionType
+    options?: string[]
+    is_required: boolean
+  }
+  mode?: 'add' | 'edit'
 }
 
-export function QuestionEditor({ onSave, onCancel }: QuestionEditorProps) {
-  const [questionText, setQuestionText] = useState('')
-  const [questionType, setQuestionType] = useState<QuestionType>('short_answer')
-  const [isRequired, setIsRequired] = useState(false)
-  const [options, setOptions] = useState<string[]>([''])
+export function QuestionEditor({ onSave, onCancel, initialData, mode = 'add' }: QuestionEditorProps) {
+  const [questionText, setQuestionText] = useState(initialData?.question_text || '')
+  const [questionType, setQuestionType] = useState<QuestionType>(initialData?.question_type || 'short_answer')
+  const [isRequired, setIsRequired] = useState(initialData?.is_required || false)
+  const [options, setOptions] = useState<string[]>(initialData?.options || [''])
 
   const choiceTypes: QuestionType[] = ['multiple_choice', 'dropdown', 'checkboxes']
   const needsOptions = choiceTypes.includes(questionType)
@@ -130,7 +137,7 @@ export function QuestionEditor({ onSave, onCancel }: QuestionEditorProps) {
           Cancel
         </Button>
         <Button type="submit" className="btn-accent">
-          Add Question
+          {mode === 'edit' ? 'Save Changes' : 'Add Question'}
         </Button>
       </div>
     </form>
