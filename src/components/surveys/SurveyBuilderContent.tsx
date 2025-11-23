@@ -132,6 +132,7 @@ function QuestionItem({
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           className={`p-4 ${snapshot.isDragging ? 'opacity-50' : ''}`}
+          style={provided.draggableProps.style}
         >
           {content}
         </Card>
@@ -327,7 +328,7 @@ export function SurveyBuilderContent({ surveyId }: SurveyBuilderContentProps) {
               >
                 {questions.map((question, index) => (
                   <QuestionItem
-                    key={question.id}
+                    key={`${question.id}-${index}`}
                     question={question}
                     index={index}
                     onEdit={setEditingQuestion}
