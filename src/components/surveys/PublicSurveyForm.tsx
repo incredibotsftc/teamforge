@@ -20,8 +20,6 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
   const router = useRouter()
   const [survey, setSurvey] = useState<SurveyWithQuestions | null>(null)
   const [answers, setAnswers] = useState<Record<string, { answer_text?: string; answer_options?: string[] }>>({})
-  const [respondentName, setRespondentName] = useState('')
-  const [respondentEmail, setRespondentEmail] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -34,7 +32,15 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
   const loadSurvey = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/public/surveys/${surveyId}`)
+      // Add cache-busting to ensure we get the latest survey data
+      const timestamp = new Date().getTime()
+      const response = await fetch(`/api/public/surveys/${surveyId}?t=${timestamp}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      })
       if (!response.ok) {
         if (response.status === 403) {
           setError('This survey is not currently available')
@@ -45,7 +51,7 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
       }
       const { survey: loadedSurvey } = await response.json()
       setSurvey(loadedSurvey)
-    } catch (err) {
+    } catch {
       setError('Failed to load survey')
     } finally {
       setIsLoading(false)
@@ -77,8 +83,6 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          respondent_name: respondentName || undefined,
-          respondent_email: respondentEmail || undefined,
           answers: answerArray
         })
       })
@@ -115,42 +119,41 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">{survey.title}</h1>
-        {survey.description && (
-          <p className="text-muted-foreground mt-2">{survey.description}</p>
+    <div className="w-full py-8 px-4">
+      <div className="w-full border rounded-xl shadow-sm bg-card">
+        {/* Template Header with Title Overlay */}
+        {survey.template?.header_image_url ? (
+          <div className="relative w-full h-64 md:h-80 overflow-hidden rounded-t-xl">
+            <img
+              src={survey.template.header_image_url}
+              alt="Survey header"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end">
+              <div className="p-8 w-full">
+                <h1 className="text-3xl md:text-4xl font-bold text-white">{survey.title}</h1>
+                {survey.description && (
+                  <p className="text-white/90 mt-2">{survey.description}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="pt-8 pb-6 px-6">
+            <h1 className="text-3xl font-bold text-center">{survey.title}</h1>
+            {survey.description && (
+              <p className="text-muted-foreground mt-2 text-center">{survey.description}</p>
+            )}
+          </div>
         )}
-      </div>
+
+        <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-6 px-6 pt-6 pb-8">
 
       {error && (
         <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
           {error}
         </div>
       )}
-
-      <div className="space-y-2">
-        <Label htmlFor="respondentName">Your Name (Optional)</Label>
-        <Input
-          id="respondentName"
-          value={respondentName}
-          onChange={(e) => setRespondentName(e.target.value)}
-          placeholder="Enter your name"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="respondentEmail">Your Email (Optional)</Label>
-        <Input
-          id="respondentEmail"
-          type="email"
-          value={respondentEmail}
-          onChange={(e) => setRespondentEmail(e.target.value)}
-          placeholder="Enter your email"
-        />
-      </div>
-
-      <hr />
 
       {survey.questions.map((question, index) => (
         <div key={question.id} className="space-y-3">
@@ -237,10 +240,39 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
         </div>
       ))}
 
-      <Button type="submit" disabled={isSubmitting} className="w-full btn-accent">
-        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Submit Survey
-      </Button>
-    </form>
+          <Button type="submit" disabled={isSubmitting} className="w-full btn-accent">
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Submit Survey
+          </Button>
+        </form>
+
+        {/* Template Footer */}
+        {survey.template?.footer_html && (
+          <div className="max-w-2xl mx-auto px-6 pb-8">
+            <div className="p-6 bg-muted/50 rounded-lg">
+              <div
+                className="prose prose-sm dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: survey.template.footer_html }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Powered by Footer */}
+      <div className="text-center py-4">
+        <p className="text-sm text-muted-foreground">
+          Powered by{' '}
+          <a
+            href="https://www.ftcteamforge.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            FTC TeamForge
+          </a>
+        </p>
+      </div>
+    </div>
   )
 }

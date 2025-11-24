@@ -29,18 +29,44 @@ export async function GET(
         )
       }
 
+      // First get the survey details with questions
+      const { data: surveyDetails } = await supabase
+        .from('surveys')
+        .select(`
+          id,
+          title,
+          description,
+          status,
+          questions:survey_questions(
+            id,
+            question_text,
+            question_type,
+            options,
+            is_required,
+            sort_order
+          )
+        `)
+        .eq('id', surveyId)
+        .single()
+
+      // Sort questions by sort_order
+      if (surveyDetails?.questions) {
+        surveyDetails.questions.sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
+      }
+
       // Fetch all responses with answers
       const { data: responses, error } = await supabase
         .from('survey_responses')
         .select(`
-          *,
-          survey_answers (
-            *,
-            survey_questions (
-              question_text,
-              question_type,
-              options
-            )
+          id,
+          respondent_name,
+          respondent_email,
+          submitted_at,
+          answers:survey_answers(
+            id,
+            question_id,
+            answer_text,
+            answer_options
           )
         `)
         .eq('survey_id', surveyId)
@@ -50,7 +76,77 @@ export async function GET(
         throw new Error(`Failed to fetch responses: ${error.message}`)
       }
 
-      return NextResponse.json({ responses })
+      // Calculate statistics for each question
+      const questionStats: Record<string, {
+        type: string
+        options?: Record<string, number>
+        responses?: string[]
+        totalResponses: number
+      }> = {}
+
+      surveyDetails?.questions?.forEach((question: {
+        id: string
+        question_type: string
+        options?: string[]
+      }) => {
+        const questionAnswers = responses?.flatMap(r =>
+          r.answers?.filter((a: { question_id: string }) => a.question_id === question.id) || []
+        ) || []
+
+        if (question.question_type === 'multiple_choice' || question.question_type === 'dropdown') {
+          // Count responses for each option
+          const optionCounts: Record<string, number> = {}
+          question.options?.forEach((option: string) => {
+            optionCounts[option] = 0
+          })
+
+          questionAnswers.forEach((answer: { answer_text?: string }) => {
+            if (answer.answer_text && optionCounts.hasOwnProperty(answer.answer_text)) {
+              optionCounts[answer.answer_text]++
+            }
+          })
+
+          questionStats[question.id] = {
+            type: 'choice',
+            options: optionCounts,
+            totalResponses: questionAnswers.length
+          }
+        } else if (question.question_type === 'checkboxes') {
+          // Count responses for checkbox options
+          const optionCounts: Record<string, number> = {}
+          question.options?.forEach((option: string) => {
+            optionCounts[option] = 0
+          })
+
+          questionAnswers.forEach((answer: { answer_options?: string[] }) => {
+            answer.answer_options?.forEach((option: string) => {
+              if (optionCounts.hasOwnProperty(option)) {
+                optionCounts[option]++
+              }
+            })
+          })
+
+          questionStats[question.id] = {
+            type: 'checkboxes',
+            options: optionCounts,
+            totalResponses: questionAnswers.length
+          }
+        } else {
+          // Text responses - just collect them
+          questionStats[question.id] = {
+            type: 'text',
+            responses: questionAnswers.map((a: { answer_text?: string }) => a.answer_text).filter(Boolean) as string[],
+            totalResponses: questionAnswers.length
+          }
+        }
+      })
+
+      return NextResponse.json({
+        survey: surveyDetails,
+        responses: responses || [],
+        responseCount: responses?.length || 0,
+        questionStats
+      })
     })
   } catch (error) {
     return handleAPIError(error)

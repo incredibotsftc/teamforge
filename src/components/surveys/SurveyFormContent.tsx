@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabase'
 import { useAppData } from '@/components/AppDataProvider'
 import { useAuth } from '@/components/AuthProvider'
-import { Loader2 } from 'lucide-react'
-import { SurveyStatus } from '@/types/surveys'
+import { Loader2, FileText } from 'lucide-react'
+import { SurveyStatus, SurveyTemplate } from '@/types/surveys'
 
 interface SurveyFormContentProps {
   surveyId?: string
@@ -24,9 +24,16 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<SurveyStatus>('draft')
+  const [templateId, setTemplateId] = useState<string>('')
+  const [templates, setTemplates] = useState<SurveyTemplate[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Load templates on mount
+  useEffect(() => {
+    loadTemplates()
+  }, [])
 
   // Load existing survey data for edit mode
   useEffect(() => {
@@ -35,6 +42,26 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surveyId, mode])
+
+  const loadTemplates = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+
+      const response = await fetch('/api/survey-templates', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        const { templates: loadedTemplates } = await response.json()
+        setTemplates(loadedTemplates || [])
+      }
+    } catch (error) {
+      console.error('Error loading templates:', error)
+    }
+  }
 
   const loadSurveyData = async () => {
     try {
@@ -53,6 +80,7 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
         setTitle(data.title || '')
         setDescription(data.description || '')
         setStatus(data.status || 'draft')
+        setTemplateId(data.template_id || '')
       }
     } catch (err) {
       console.error('Error loading survey:', err)
@@ -97,6 +125,7 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
             title: title.trim(),
             description: description.trim() || null,
             status,
+            template_id: templateId || null,
             team_id: team.id,
             season_id: currentSeason.id,
             created_by: user.id,
@@ -115,6 +144,7 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
           title: string
           description: string | null
           status: SurveyStatus
+          template_id?: string | null
           updated_at: string
           published_at?: string
           closed_at?: string
@@ -122,6 +152,7 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
           title: title.trim(),
           description: description.trim() || null,
           status,
+          template_id: templateId || null,
           updated_at: new Date().toISOString()
         }
 
@@ -189,6 +220,29 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
           rows={3}
           disabled={isSubmitting}
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="template">Template (Optional)</Label>
+        <Select value={templateId || 'none'} onValueChange={(value) => setTemplateId(value === 'none' ? '' : value)}>
+          <SelectTrigger id="template" disabled={isSubmitting}>
+            <SelectValue placeholder="Select a template (optional)" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No Template</SelectItem>
+            {templates.map((template) => (
+              <SelectItem key={template.id} value={template.id}>
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  {template.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Apply a template for custom header image and footer content
+        </p>
       </div>
 
       <div className="space-y-2">

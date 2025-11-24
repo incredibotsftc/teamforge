@@ -16,12 +16,28 @@ export interface Survey {
   title: string
   description?: string
   status: SurveyStatus
+  template_id?: string
   created_by: string
   created_at: string
   updated_at: string
   published_at?: string
   closed_at?: string
   question_count?: number // Aggregate field from helper function
+  template?: SurveyTemplate // Include when fetching with template
+}
+
+export interface SurveyTemplate {
+  id: string
+  team_id: string
+  name: string
+  description?: string
+  header_image_url?: string
+  footer_content?: Record<string, unknown> // BlockNote JSON content
+  footer_html?: string
+  is_active: boolean
+  created_by: string
+  created_at: string
+  updated_at: string
 }
 
 export interface SurveyQuestion {
@@ -59,6 +75,7 @@ export interface SurveyAnswer {
 
 export interface SurveyWithQuestions extends Survey {
   questions: SurveyQuestion[]
+  template?: SurveyTemplate
 }
 
 export interface ResponseAnalytics {
@@ -81,6 +98,15 @@ export interface CreateSurveyForm {
   title: string
   description?: string
   status: SurveyStatus
+  template_id?: string
+}
+
+export interface CreateTemplateForm {
+  name: string
+  description?: string
+  header_image_url?: string
+  footer_content?: Record<string, unknown>
+  footer_html?: string
 }
 
 export interface CreateQuestionForm {

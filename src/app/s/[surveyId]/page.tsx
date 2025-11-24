@@ -8,8 +8,8 @@ function Page() {
   const surveyId = params.surveyId as string
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container max-w-4xl py-12">
+    <div className="min-h-screen bg-background flex justify-center">
+      <div className="w-full max-w-4xl">
         <PublicSurveyForm surveyId={surveyId} />
       </div>
     </div>

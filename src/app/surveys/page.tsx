@@ -5,15 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Plus } from 'lucide-react'
+import { Search, Plus, Palette, ClipboardList } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import type { Survey } from '@/types/surveys'
 import { SurveyList } from '@/components/surveys/SurveyList'
 import { SurveyFormContent } from '@/components/surveys/SurveyFormContent'
+import { TemplateFormContent } from '@/components/surveys/TemplateFormContent'
 import { useRouter } from 'next/navigation'
 import { getTeamSurveys } from '@/lib/surveys'
 import { useAppData } from '@/components/AppDataProvider'
 import { useTeamData } from '@/hooks/useTeamData'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 function Page() {
   const router = useRouter()
@@ -21,6 +23,7 @@ function Page() {
   const { currentSeason } = useAppData()
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const [isTemplateSheetOpen, setIsTemplateSheetOpen] = useState(false)
   const [editingSurveyId, setEditingSurveyId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -87,27 +90,36 @@ function Page() {
     }
   }
 
-  const handleCloseSheet = () => {
-    setIsSheetOpen(false)
-    setEditingSurveyId(null)
+  const handleOpenTemplateCreation = () => {
+    setIsTemplateSheetOpen(true)
   }
 
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Surveys</h1>
-            <p className="text-muted-foreground">
-              Create and manage surveys for your team
-            </p>
-          </div>
-          <Button onClick={handleOpenCreateSurvey} className="btn-accent">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Survey
-          </Button>
-        </div>
+  const handleTemplateSuccess = () => {
+    setIsTemplateSheetOpen(false)
+    // Optionally show a success message
+    alert('Template created successfully!')
+  }
 
+  const actions = (
+    <div className="flex gap-2">
+      <Button onClick={handleOpenTemplateCreation} className="btn-accent">
+        <Palette className="h-4 w-4 mr-2" />
+        Create Template
+      </Button>
+      <Button onClick={handleOpenCreateSurvey} className="btn-accent">
+        <Plus className="h-4 w-4 mr-2" />
+        Create Survey
+      </Button>
+    </div>
+  )
+
+  return (
+    <ProtectedRoute>
+      <DashboardLayout
+        pageTitle="Surveys"
+        pageIcon={ClipboardList}
+        actions={actions}
+      >
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -137,23 +149,35 @@ function Page() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto p-6">
-          <SheetHeader className="p-0 mb-1">
-            <SheetTitle>
-              {editingSurveyId ? 'Edit Survey' : 'Create New Survey'}
-            </SheetTitle>
-          </SheetHeader>
-          <SurveyFormContent
-            surveyId={editingSurveyId || undefined}
-            mode={editingSurveyId ? 'edit' : 'create'}
-            onSuccess={handleSuccess}
-          />
-        </SheetContent>
-      </Sheet>
-    </DashboardLayout>
+        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+          <SheetContent className="w-full sm:max-w-2xl overflow-y-auto p-6">
+            <SheetHeader className="p-0 mb-1">
+              <SheetTitle>
+                {editingSurveyId ? 'Edit Survey' : 'Create New Survey'}
+              </SheetTitle>
+            </SheetHeader>
+            <SurveyFormContent
+              surveyId={editingSurveyId || undefined}
+              mode={editingSurveyId ? 'edit' : 'create'}
+              onSuccess={handleSuccess}
+            />
+          </SheetContent>
+        </Sheet>
+
+        <Sheet open={isTemplateSheetOpen} onOpenChange={setIsTemplateSheetOpen}>
+          <SheetContent className="w-full sm:max-w-3xl overflow-y-auto p-6">
+            <SheetHeader className="p-0 mb-1">
+              <SheetTitle>Create Survey Template</SheetTitle>
+            </SheetHeader>
+            <TemplateFormContent
+              mode="create"
+              onSuccess={handleTemplateSuccess}
+            />
+          </SheetContent>
+        </Sheet>
+      </DashboardLayout>
+    </ProtectedRoute>
   )
 }
 

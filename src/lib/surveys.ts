@@ -1,5 +1,4 @@
 import { supabase } from './supabase'
-import type { Survey, SurveyQuestion, SurveyResponse, SurveyAnswer } from '@/types/surveys'
 
 export async function getTeamSurveys(teamId: string, seasonId: string) {
   const { data, error } = await supabase

@@ -32,7 +32,7 @@ export async function GET(
 
       // Sort questions by sort_order
       if (survey.survey_questions) {
-        survey.survey_questions.sort((a, b) => a.sort_order - b.sort_order)
+        survey.survey_questions.sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
       }
 
       return NextResponse.json({ survey })

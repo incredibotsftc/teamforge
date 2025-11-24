@@ -9,8 +9,8 @@ function Page() {
   const responseId = params.responseId as string
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container max-w-4xl py-12">
+    <div className="min-h-screen bg-background flex justify-center">
+      <div className="w-full max-w-4xl">
         <SurveyResponseView surveyId={surveyId} responseId={responseId} />
       </div>
     </div>

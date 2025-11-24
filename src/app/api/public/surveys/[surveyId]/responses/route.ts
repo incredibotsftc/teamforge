@@ -52,7 +52,11 @@ export async function POST(
 
     // Create the answers
     if (answers && answers.length > 0) {
-      const answersToInsert = answers.map((answer: any) => ({
+      const answersToInsert = answers.map((answer: {
+        question_id: string
+        answer_text?: string
+        answer_options?: string[]
+      }) => ({
         response_id: response.id,
         question_id: answer.question_id,
         answer_text: answer.answer_text,

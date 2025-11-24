@@ -34,7 +34,8 @@ export async function GET(
             id,
             question_text,
             question_type,
-            options
+            options,
+            sort_order
           )
         )
       `)
@@ -50,6 +51,15 @@ export async function GET(
         )
       }
       throw new Error(`Failed to fetch response: ${error.message}`)
+    }
+
+    // Sort the answers by question sort_order
+    if (response?.survey_answers) {
+      response.survey_answers.sort((a: { survey_questions?: { sort_order?: number } }, b: { survey_questions?: { sort_order?: number } }) => {
+        const sortA = a.survey_questions?.sort_order ?? 999
+        const sortB = b.survey_questions?.sort_order ?? 999
+        return sortA - sortB
+      })
     }
 
     return NextResponse.json({ response })

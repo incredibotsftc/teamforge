@@ -11,12 +11,13 @@ export async function GET(
   try {
     const { surveyId } = await params
 
-    // Fetch survey with all questions - no auth required
+    // Fetch survey with all questions and template - no auth required
     const { data: survey, error } = await supabase
       .from('surveys')
       .select(`
         *,
-        questions:survey_questions(*)
+        questions:survey_questions(*),
+        template:survey_templates(*)
       `)
       .eq('id', surveyId)
       .single()
@@ -41,10 +42,19 @@ export async function GET(
 
     // Sort questions by sort_order
     if (survey.questions) {
-      survey.questions.sort((a: any, b: any) => a.sort_order - b.sort_order)
+      survey.questions.sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
     }
 
-    return NextResponse.json({ survey })
+    return NextResponse.json(
+      { survey },
+      {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      }
+    )
   } catch (error) {
     return handleAPIError(error)
   }

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { QuestionEditor } from './QuestionEditor'
-import { SurveyQuestion } from '@/types/surveys'
+import { SurveyQuestion, QuestionType } from '@/types/surveys'
 import { Plus, Trash2, GripVertical, Edit2, ChevronUp, ChevronDown } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import {
@@ -302,7 +302,7 @@ export function SurveyBuilderContent({ surveyId }: SurveyBuilderContentProps) {
         }}
         initialData={editingQuestion ? {
           question_text: editingQuestion.question_text,
-          question_type: editingQuestion.question_type as any,
+          question_type: editingQuestion.question_type as QuestionType,
           options: editingQuestion.options,
           is_required: editingQuestion.is_required
         } : undefined}
