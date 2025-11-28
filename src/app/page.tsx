@@ -47,11 +47,18 @@ function AppContent() {
     setNeedsFRE(false)
   }
 
-  // Redirect authenticated users to dashboard
+  // Redirect authenticated users to dashboard or returnUrl
   useEffect(() => {
     // Only redirect if we've determined setup is complete AND user is authenticated
     if (!authLoading && !loading && user && needsFRE === false) {
-      router.push('/dashboard')
+      const params = new URLSearchParams(window.location.search)
+      const returnUrl = params.get('returnUrl')
+
+      if (returnUrl) {
+        router.push(returnUrl)
+      } else {
+        router.push('/dashboard')
+      }
     }
   }, [user, authLoading, loading, needsFRE, router])
 

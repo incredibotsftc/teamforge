@@ -18,7 +18,8 @@ import {
   LogOut,
   UsersRound,
   ClipboardList,
-  Shield
+  Shield,
+  FileQuestion
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
@@ -57,6 +58,7 @@ const coreModules = [
   { icon: DollarSign, label: 'Budget & Sponsors', href: '/budget' },
   { icon: Users, label: 'Mentoring', href: '/mentoring' },
   { icon: ClipboardList, label: 'Scouting', href: '/scouting' },
+  { icon: FileQuestion, label: 'Surveys', href: '/surveys' },
 ]
 
 // Inner component that uses the sidebar context

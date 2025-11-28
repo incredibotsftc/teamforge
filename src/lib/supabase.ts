@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -8,28 +9,34 @@ export const isSupabaseConfigured = () => {
     return !!(supabaseUrl && supabaseAnonKey)
 }
 
-// Lazy-loaded Supabase client to allow build to pass without env vars
-let _supabase: SupabaseClient | null = null
-
-export const supabase = new Proxy({} as SupabaseClient, {
-    get(_target, prop) {
-        if (!_supabase) {
-            if (!isSupabaseConfigured()) {
-                throw new Error('Missing Supabase environment variables')
-            }
-            _supabase = createClient(supabaseUrl, supabaseAnonKey)
-        }
-        const value = _supabase[prop as keyof SupabaseClient]
-        return typeof value === 'function' ? value.bind(_supabase) : value
-    }
-})
-
 // Helper function to ensure Supabase is configured before use
 function ensureSupabaseConfigured() {
     if (!isSupabaseConfigured()) {
         throw new Error('Missing Supabase environment variables')
     }
 }
+
+// Lazy-loaded Supabase client to allow build to pass without env vars
+let _supabase: SupabaseClient | null = null
+
+export const supabase = new Proxy({} as SupabaseClient, {
+    get(_target, prop) {
+        if (!_supabase) {
+            ensureSupabaseConfigured()
+
+            if (typeof window !== 'undefined') {
+                // Use createBrowserClient on the client to handle cookies automatically
+                _supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
+            } else {
+                // Use createClient on the server (legacy/fallback)
+                // Note: Server components should ideally use createServerClient from @supabase/ssr
+                _supabase = createClient(supabaseUrl, supabaseAnonKey)
+            }
+        }
+        const value = _supabase[prop as keyof SupabaseClient]
+        return typeof value === 'function' ? value.bind(_supabase) : value
+    }
+})
 
 // Helper function to check database status
 export async function checkDatabaseStatus() {
