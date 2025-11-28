@@ -274,9 +274,9 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
               disabled={isSubmitting}
             />
             <div className="flex-1">
-              <div className="font-medium">Private</div>
+              <div className="font-medium">For Team Only</div>
               <div className="text-sm text-muted-foreground">
-                Requires users to log in before accessing the survey. Anyone logged in can respond.
+                Requires users to log in to their team account before accessing the survey.
               </div>
             </div>
           </div>
