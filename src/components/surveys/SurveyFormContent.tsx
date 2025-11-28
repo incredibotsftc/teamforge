@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase'
 import { useAppData } from '@/components/AppDataProvider'
 import { useAuth } from '@/components/AuthProvider'
 import { Loader2, FileText } from 'lucide-react'
-import { SurveyStatus, SurveyTemplate } from '@/types/surveys'
+import { SurveyStatus, SurveyTemplate, SurveyVisibility } from '@/types/surveys'
 
 interface SurveyFormContentProps {
   surveyId?: string
@@ -24,6 +24,7 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<SurveyStatus>('draft')
+  const [visibility, setVisibility] = useState<SurveyVisibility>('public')
   const [templateId, setTemplateId] = useState<string>('')
   const [templates, setTemplates] = useState<SurveyTemplate[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -40,7 +41,7 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
     if (mode === 'edit' && surveyId) {
       loadSurveyData()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surveyId, mode])
 
   const loadTemplates = async () => {
@@ -80,6 +81,7 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
         setTitle(data.title || '')
         setDescription(data.description || '')
         setStatus(data.status || 'draft')
+        setVisibility(data.visibility || 'public')
         setTemplateId(data.template_id || '')
       }
     } catch (err) {
@@ -125,6 +127,7 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
             title: title.trim(),
             description: description.trim() || null,
             status,
+            visibility,
             template_id: templateId || null,
             team_id: team.id,
             season_id: currentSeason.id,
@@ -134,7 +137,10 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
           .select()
           .single()
 
-        if (insertError) throw insertError
+        if (insertError) {
+          console.error('Supabase insert error:', insertError)
+          throw insertError
+        }
 
         // Pass the created survey ID to onSuccess
         onSuccess?.(data?.id)
@@ -144,6 +150,7 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
           title: string
           description: string | null
           status: SurveyStatus
+          visibility: SurveyVisibility
           template_id?: string | null
           updated_at: string
           published_at?: string
@@ -152,6 +159,7 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
           title: title.trim(),
           description: description.trim() || null,
           status,
+          visibility,
           template_id: templateId || null,
           updated_at: new Date().toISOString()
         }
@@ -220,6 +228,59 @@ export function SurveyFormContent({ surveyId, mode, onSuccess }: SurveyFormConte
           rows={3}
           disabled={isSubmitting}
         />
+      </div>
+
+      <div className="space-y-3">
+        <Label>Visibility *</Label>
+        <div className="space-y-2">
+          <div
+            className={`flex items-start space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${visibility === 'public'
+              ? 'border-primary bg-primary/5'
+              : 'border-border hover:border-primary/50'
+              }`}
+            onClick={() => setVisibility('public')}
+          >
+            <input
+              type="radio"
+              name="visibility"
+              value="public"
+              checked={visibility === 'public'}
+              onChange={(e) => setVisibility(e.target.value as SurveyVisibility)}
+              className="mt-1"
+              disabled={isSubmitting}
+            />
+            <div className="flex-1">
+              <div className="font-medium">Public</div>
+              <div className="text-sm text-muted-foreground">
+                Anyone with the link can access and respond to this survey without logging in.
+              </div>
+            </div>
+          </div>
+
+          <div
+            className={`flex items-start space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${visibility === 'private'
+              ? 'border-primary bg-primary/5'
+              : 'border-border hover:border-primary/50'
+              }`}
+            onClick={() => setVisibility('private')}
+          >
+            <input
+              type="radio"
+              name="visibility"
+              value="private"
+              checked={visibility === 'private'}
+              onChange={(e) => setVisibility(e.target.value as SurveyVisibility)}
+              className="mt-1"
+              disabled={isSubmitting}
+            />
+            <div className="flex-1">
+              <div className="font-medium">Private</div>
+              <div className="text-sm text-muted-foreground">
+                Requires users to log in before accessing the survey. Anyone logged in can respond.
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-2">

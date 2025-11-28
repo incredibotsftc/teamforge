@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '@/lib/api-auth'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { handleAPIError, ValidationError } from '@/lib/api-errors'
 import { createClient } from '@supabase/supabase-js'
 
@@ -12,142 +13,186 @@ export async function GET(
 ) {
   try {
     const { surveyId } = await params
+    const cookieStore = await cookies()
 
-    return await withAuth(request, async ({ teamMember, supabase }) => {
-      // Verify survey belongs to team
-      const { data: survey } = await supabase
-        .from('surveys')
-        .select('id')
-        .eq('id', surveyId)
-        .eq('team_id', teamMember.team_id)
-        .single()
+    // Create a server-side Supabase client that can read cookies
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options: CookieOptions) {
+            cookieStore.set({ name, value, ...options })
+          },
+          remove(name: string, options: CookieOptions) {
+            cookieStore.set({ name, value: '', ...options })
+          },
+        },
+      }
+    )
 
-      if (!survey) {
-        return NextResponse.json(
-          { error: 'Survey not found' },
-          { status: 404 }
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    // Get team membership
+    const { data: teamMember } = await supabase
+      .from('team_members')
+      .select('id, team_id, role')
+      .eq('user_id', session.user.id)
+      .eq('is_active', true)
+      .single()
+
+    if (!teamMember) {
+      return NextResponse.json(
+        { error: 'Team membership required' },
+        { status: 403 }
+      )
+    }
+
+    // Verify survey belongs to team
+    const { data: survey } = await supabase
+      .from('surveys')
+      .select('id')
+      .eq('id', surveyId)
+      .eq('team_id', teamMember.team_id)
+      .single()
+
+    if (!survey) {
+      return NextResponse.json(
+        { error: 'Survey not found' },
+        { status: 404 }
+      )
+    }
+
+    // First get the survey details with questions
+    const { data: surveyDetails } = await supabase
+      .from('surveys')
+      .select(`
+        id,
+        title,
+        description,
+        status,
+        questions:survey_questions(
+          id,
+          question_text,
+          question_type,
+          options,
+          is_required,
+          sort_order
         )
-      }
+      `)
+      .eq('id', surveyId)
+      .single()
 
-      // First get the survey details with questions
-      const { data: surveyDetails } = await supabase
-        .from('surveys')
-        .select(`
+    // Sort questions by sort_order
+    if (surveyDetails?.questions) {
+      surveyDetails.questions.sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
+    }
+
+    // Fetch all responses with answers
+    const { data: responses, error } = await supabase
+      .from('survey_responses')
+      .select(`
+        id,
+        respondent_name,
+        respondent_email,
+        submitted_at,
+        answers:survey_answers(
           id,
-          title,
-          description,
-          status,
-          questions:survey_questions(
-            id,
-            question_text,
-            question_type,
-            options,
-            is_required,
-            sort_order
-          )
-        `)
-        .eq('id', surveyId)
-        .single()
+          question_id,
+          answer_text,
+          answer_options
+        )
+      `)
+      .eq('survey_id', surveyId)
+      .order('submitted_at', { ascending: false })
 
-      // Sort questions by sort_order
-      if (surveyDetails?.questions) {
-        surveyDetails.questions.sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
-      }
+    if (error) {
+      throw new Error(`Failed to fetch responses: ${error.message}`)
+    }
 
-      // Fetch all responses with answers
-      const { data: responses, error } = await supabase
-        .from('survey_responses')
-        .select(`
-          id,
-          respondent_name,
-          respondent_email,
-          submitted_at,
-          answers:survey_answers(
-            id,
-            question_id,
-            answer_text,
-            answer_options
-          )
-        `)
-        .eq('survey_id', surveyId)
-        .order('submitted_at', { ascending: false })
+    // Calculate statistics for each question
+    const questionStats: Record<string, {
+      type: string
+      options?: Record<string, number>
+      responses?: string[]
+      totalResponses: number
+    }> = {}
 
-      if (error) {
-        throw new Error(`Failed to fetch responses: ${error.message}`)
-      }
+    surveyDetails?.questions?.forEach((question: {
+      id: string
+      question_type: string
+      options?: string[]
+    }) => {
+      const questionAnswers = responses?.flatMap(r =>
+        r.answers?.filter((a: { question_id: string }) => a.question_id === question.id) || []
+      ) || []
 
-      // Calculate statistics for each question
-      const questionStats: Record<string, {
-        type: string
-        options?: Record<string, number>
-        responses?: string[]
-        totalResponses: number
-      }> = {}
+      if (question.question_type === 'multiple_choice' || question.question_type === 'dropdown') {
+        // Count responses for each option
+        const optionCounts: Record<string, number> = {}
+        question.options?.forEach((option: string) => {
+          optionCounts[option] = 0
+        })
 
-      surveyDetails?.questions?.forEach((question: {
-        id: string
-        question_type: string
-        options?: string[]
-      }) => {
-        const questionAnswers = responses?.flatMap(r =>
-          r.answers?.filter((a: { question_id: string }) => a.question_id === question.id) || []
-        ) || []
+        questionAnswers.forEach((answer: { answer_text?: string }) => {
+          if (answer.answer_text && optionCounts.hasOwnProperty(answer.answer_text)) {
+            optionCounts[answer.answer_text]++
+          }
+        })
 
-        if (question.question_type === 'multiple_choice' || question.question_type === 'dropdown') {
-          // Count responses for each option
-          const optionCounts: Record<string, number> = {}
-          question.options?.forEach((option: string) => {
-            optionCounts[option] = 0
-          })
+        questionStats[question.id] = {
+          type: 'choice',
+          options: optionCounts,
+          totalResponses: questionAnswers.length
+        }
+      } else if (question.question_type === 'checkboxes') {
+        // Count responses for checkbox options
+        const optionCounts: Record<string, number> = {}
+        question.options?.forEach((option: string) => {
+          optionCounts[option] = 0
+        })
 
-          questionAnswers.forEach((answer: { answer_text?: string }) => {
-            if (answer.answer_text && optionCounts.hasOwnProperty(answer.answer_text)) {
-              optionCounts[answer.answer_text]++
+        questionAnswers.forEach((answer: { answer_options?: string[] }) => {
+          answer.answer_options?.forEach((option: string) => {
+            if (optionCounts.hasOwnProperty(option)) {
+              optionCounts[option]++
             }
           })
+        })
 
-          questionStats[question.id] = {
-            type: 'choice',
-            options: optionCounts,
-            totalResponses: questionAnswers.length
-          }
-        } else if (question.question_type === 'checkboxes') {
-          // Count responses for checkbox options
-          const optionCounts: Record<string, number> = {}
-          question.options?.forEach((option: string) => {
-            optionCounts[option] = 0
-          })
-
-          questionAnswers.forEach((answer: { answer_options?: string[] }) => {
-            answer.answer_options?.forEach((option: string) => {
-              if (optionCounts.hasOwnProperty(option)) {
-                optionCounts[option]++
-              }
-            })
-          })
-
-          questionStats[question.id] = {
-            type: 'checkboxes',
-            options: optionCounts,
-            totalResponses: questionAnswers.length
-          }
-        } else {
-          // Text responses - just collect them
-          questionStats[question.id] = {
-            type: 'text',
-            responses: questionAnswers.map((a: { answer_text?: string }) => a.answer_text).filter(Boolean) as string[],
-            totalResponses: questionAnswers.length
-          }
+        questionStats[question.id] = {
+          type: 'checkboxes',
+          options: optionCounts,
+          totalResponses: questionAnswers.length
         }
-      })
-
-      return NextResponse.json({
-        survey: surveyDetails,
-        responses: responses || [],
-        responseCount: responses?.length || 0,
-        questionStats
-      })
+      } else {
+        // Text responses - just collect them
+        questionStats[question.id] = {
+          type: 'text',
+          responses: questionAnswers.map((a: { answer_text?: string }) => a.answer_text).filter(Boolean) as string[],
+          totalResponses: questionAnswers.length
+        }
+      }
     })
+
+    return NextResponse.json({
+      survey: surveyDetails,
+      responses: responses || [],
+      responseCount: responses?.length || 0,
+      questionStats
+    })
+
   } catch (error) {
     return handleAPIError(error)
   }

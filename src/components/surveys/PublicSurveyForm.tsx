@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SurveyWithQuestions } from '@/types/surveys'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Star } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface PublicSurveyFormProps {
@@ -26,7 +26,7 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
 
   useEffect(() => {
     loadSurvey()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surveyId])
 
   const loadSurvey = async () => {
@@ -36,14 +36,18 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
       const timestamp = new Date().getTime()
       const response = await fetch(`/api/public/surveys/${surveyId}?t=${timestamp}`, {
         cache: 'no-store',
+        credentials: 'include',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache'
         }
       })
       if (!response.ok) {
-        if (response.status === 403) {
-          setError('This survey is not currently available')
+        const errorData = await response.json().catch(() => ({}))
+        if (response.status === 401) {
+          setError(errorData.message || 'Please log in to access this survey')
+        } else if (response.status === 403) {
+          setError(errorData.message || 'You do not have permission to access this survey')
         } else {
           setError('Survey not found')
         }
@@ -111,9 +115,21 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
   }
 
   if (error || !survey) {
+    const showLoginButton = error?.includes('log in') || error?.includes('Authentication required')
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">{error || 'This survey is not currently available.'}</p>
+        <p className="text-muted-foreground mb-4">{error || 'This survey is not currently available.'}</p>
+        {showLoginButton && (
+          <Button
+            onClick={() => {
+              const returnUrl = encodeURIComponent(window.location.pathname)
+              window.location.href = `/?returnUrl=${returnUrl}`
+            }}
+            className="btn-accent"
+          >
+            Go to Login
+          </Button>
+        )}
       </div>
     )
   }
@@ -149,96 +165,130 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
 
         <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-6 px-6 pt-6 pb-8">
 
-      {error && (
-        <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
-          {error}
-        </div>
-      )}
-
-      {survey.questions.map((question, index) => (
-        <div key={question.id} className="space-y-3">
-          <Label>
-            {index + 1}. {question.question_text}
-            {question.is_required && <span className="text-destructive ml-1">*</span>}
-          </Label>
-
-          {question.question_type === 'short_answer' && (
-            <Input
-              value={answers[question.id]?.answer_text || ''}
-              onChange={(e) => setAnswers({ ...answers, [question.id]: { answer_text: e.target.value } })}
-              required={question.is_required}
-            />
-          )}
-
-          {question.question_type === 'long_answer' && (
-            <Textarea
-              value={answers[question.id]?.answer_text || ''}
-              onChange={(e) => setAnswers({ ...answers, [question.id]: { answer_text: e.target.value } })}
-              required={question.is_required}
-              rows={4}
-            />
-          )}
-
-          {question.question_type === 'multiple_choice' && question.options && (
-            <RadioGroup
-              value={answers[question.id]?.answer_text}
-              onValueChange={(value) => setAnswers({ ...answers, [question.id]: { answer_text: value } })}
-              required={question.is_required}
-            >
-              {question.options.map((option, i) => (
-                <div key={i} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`${question.id}-${i}`} />
-                  <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
-                    {option}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          )}
-
-          {question.question_type === 'dropdown' && question.options && (
-            <Select
-              value={answers[question.id]?.answer_text}
-              onValueChange={(value) => setAnswers({ ...answers, [question.id]: { answer_text: value } })}
-              required={question.is_required}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select an option" />
-              </SelectTrigger>
-              <SelectContent>
-                {question.options.map((option, i) => (
-                  <SelectItem key={i} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {question.question_type === 'checkboxes' && question.options && (
-            <div className="space-y-2">
-              {question.options.map((option, i) => (
-                <div key={i} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`${question.id}-${i}`}
-                    checked={answers[question.id]?.answer_options?.includes(option) || false}
-                    onCheckedChange={(checked) => {
-                      const currentOptions = answers[question.id]?.answer_options || []
-                      const newOptions = checked
-                        ? [...currentOptions, option]
-                        : currentOptions.filter(o => o !== option)
-                      setAnswers({ ...answers, [question.id]: { answer_options: newOptions } })
-                    }}
-                  />
-                  <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
-                    {option}
-                  </Label>
-                </div>
-              ))}
+          {error && (
+            <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
+              {error}
             </div>
           )}
-        </div>
-      ))}
+
+          {survey.questions.map((question, index) => (
+            <div key={question.id} className="space-y-3">
+              <Label>
+                {index + 1}. {question.question_text}
+                {question.is_required && <span className="text-destructive ml-1">*</span>}
+              </Label>
+
+              {question.question_type === 'short_answer' && (
+                <Input
+                  value={answers[question.id]?.answer_text || ''}
+                  onChange={(e) => setAnswers({ ...answers, [question.id]: { answer_text: e.target.value } })}
+                  required={question.is_required}
+                />
+              )}
+
+              {question.question_type === 'long_answer' && (
+                <Textarea
+                  value={answers[question.id]?.answer_text || ''}
+                  onChange={(e) => setAnswers({ ...answers, [question.id]: { answer_text: e.target.value } })}
+                  required={question.is_required}
+                  rows={4}
+                />
+              )}
+
+              {question.question_type === 'multiple_choice' && question.options && (
+                <RadioGroup
+                  value={answers[question.id]?.answer_text}
+                  onValueChange={(value) => setAnswers({ ...answers, [question.id]: { answer_text: value } })}
+                  required={question.is_required}
+                >
+                  {question.options.map((option, i) => (
+                    <div key={i} className="flex items-center space-x-2">
+                      <RadioGroupItem value={option} id={`${question.id}-${i}`} />
+                      <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              )}
+
+              {question.question_type === 'dropdown' && question.options && (
+                <Select
+                  value={answers[question.id]?.answer_text}
+                  onValueChange={(value) => setAnswers({ ...answers, [question.id]: { answer_text: value } })}
+                  required={question.is_required}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {question.options.map((option, i) => (
+                      <SelectItem key={i} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {question.question_type === 'checkboxes' && question.options && (
+                <div className="space-y-2">
+                  {question.options.map((option, i) => (
+                    <div key={i} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`${question.id}-${i}`}
+                        checked={answers[question.id]?.answer_options?.includes(option) || false}
+                        onCheckedChange={(checked) => {
+                          const currentOptions = answers[question.id]?.answer_options || []
+                          const newOptions = checked
+                            ? [...currentOptions, option]
+                            : currentOptions.filter(o => o !== option)
+                          setAnswers({ ...answers, [question.id]: { answer_options: newOptions } })
+                        }}
+                      />
+                      <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {question.question_type === 'rating' && (
+                <div className="flex items-center gap-1 py-2">
+                  {[1, 2, 3, 4, 5].map((starNum) => {
+                    const currentRating = parseInt(answers[question.id]?.answer_text || '0')
+                    const isFilled = starNum <= currentRating
+
+                    return (
+                      <button
+                        key={starNum}
+                        type="button"
+                        onClick={() => {
+                          const newRating = currentRating === starNum ? '' : starNum.toString()
+                          setAnswers({ ...answers, [question.id]: { answer_text: newRating } })
+                        }}
+                        className="focus:outline-none focus:ring-2 focus:ring-primary rounded transition-all hover:scale-110"
+                      >
+                        <Star
+                          className={`w-10 h-10 transition-colors ${isFilled
+                            ? 'text-yellow-400 fill-yellow-400'
+                            : 'text-gray-300 hover:text-yellow-200'
+                            }`}
+                          strokeWidth={2}
+                        />
+                      </button>
+                    )
+                  })}
+                  {answers[question.id]?.answer_text && (
+                    <span className="ml-3 text-sm text-muted-foreground">
+                      {answers[question.id]?.answer_text} out of 5 stars
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
 
           <Button type="submit" disabled={isSubmitting} className="w-full btn-accent">
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

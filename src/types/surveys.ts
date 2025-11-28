@@ -6,8 +6,12 @@ export type QuestionType =
   | 'multiple_choice'
   | 'dropdown'
   | 'checkboxes'
+  | 'rating'
+
 
 export type SurveyStatus = 'draft' | 'published' | 'closed'
+
+export type SurveyVisibility = 'public' | 'private'
 
 export interface Survey {
   id: string
@@ -16,6 +20,7 @@ export interface Survey {
   title: string
   description?: string
   status: SurveyStatus
+  visibility: SurveyVisibility
   template_id?: string
   created_by: string
   created_at: string
@@ -98,6 +103,7 @@ export interface CreateSurveyForm {
   title: string
   description?: string
   status: SurveyStatus
+  visibility: SurveyVisibility
   template_id?: string
 }
 

@@ -1,6 +1,9 @@
 import { supabase } from './supabase'
 
 export async function getTeamSurveys(teamId: string, seasonId: string) {
+  // Log parameters for debugging
+  console.log('getTeamSurveys called with:', { teamId, seasonId })
+
   const { data, error } = await supabase
     .from('surveys')
     .select('*')
@@ -9,8 +12,15 @@ export async function getTeamSurveys(teamId: string, seasonId: string) {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching surveys:', error)
-    throw error
+    // Log complete error information
+    console.error('Error fetching surveys - Full details:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      fullError: error
+    })
+    throw new Error(`Failed to fetch surveys: ${error.message} (code: ${error.code})`)
   }
 
   // Get question counts for each survey

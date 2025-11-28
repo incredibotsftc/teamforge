@@ -32,11 +32,21 @@ function Page() {
     if (currentTeam?.id && currentSeason?.id) {
       loadSurveys()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTeam?.id, currentSeason?.id])
 
   const loadSurveys = async () => {
-    if (!currentTeam?.id || !currentSeason?.id) return
+    console.log('loadSurveys - currentTeam:', currentTeam)
+    console.log('loadSurveys - currentSeason:', currentSeason)
+
+    if (!currentTeam?.id || !currentSeason?.id) {
+      console.warn('Skipping survey load - missing team or season:', {
+        hasTeam: !!currentTeam?.id,
+        hasSeason: !!currentSeason?.id
+      })
+      return
+    }
+
     try {
       setIsLoading(true)
       const data = await getTeamSurveys(currentTeam.id, currentSeason.id)

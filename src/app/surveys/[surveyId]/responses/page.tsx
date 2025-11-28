@@ -78,25 +78,15 @@ function Page() {
 
   useEffect(() => {
     loadResponses()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surveyId])
 
   const loadResponses = async () => {
     try {
       setIsLoading(true)
 
-      // Get the auth token from Supabase
-      const { supabase } = await import('@/lib/supabase')
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session?.access_token) {
-        throw new Error('Not authenticated')
-      }
-
       const response = await fetch(`/api/surveys/${surveyId}/responses`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
+        cache: 'no-store'
       })
 
       if (!response.ok) {

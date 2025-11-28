@@ -89,6 +89,7 @@ export function QuestionEditor({ onSave, onCancel, initialData, mode = 'add' }: 
             <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
             <SelectItem value="dropdown">Dropdown</SelectItem>
             <SelectItem value="checkboxes">Checkboxes</SelectItem>
+            <SelectItem value="rating">Star Rating</SelectItem>
           </SelectContent>
         </Select>
       </div>
