@@ -97,8 +97,8 @@ export function NotebookSidebar({
 
   // Filter pages based on search
   const filteredPages = pages.filter(page =>
-    page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    page.content_text.toLowerCase().includes(searchQuery.toLowerCase())
+    (page.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (page.content_text || '').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   // Get pages without folders (root level)

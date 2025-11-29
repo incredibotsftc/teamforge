@@ -1,0 +1,44 @@
+/* .ag-theme-quartz .ag-cell {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+} */
+.dark .ag-theme-quartz .ag-cell {
+  border-right: 0.5px solid #fff !important;
+  border-bottom: 0.5px solid #fff !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+.dark .ag-theme-quartz .ag-header-cell {
+  border-right: 0.5px solid #fff !important;
+}
+.dark .ag-theme-quartz .ag-header-row {
+  border-bottom: 0.5px solid #fff !important;
+}
+/* Custom dark mode for AG Grid quartz theme */
+.dark .ag-theme-quartz {
+  --ag-background-color: #181a1b;
+  --ag-foreground-color: #f3f4f6;
+  --ag-header-background-color: #23272a;
+  --ag-border-color: #23272a;
+  --ag-secondary-border-color: #23272a;
+  --ag-tooltip-background-color: #23272a;
+  --ag-control-panel-background-color: #23272a;
+  --ag-subheader-background-color: #23272a;
+  --ag-selected-row-background-color: #23272a;
+  --ag-row-hover-color: #23272a;
+  --ag-column-hover-color: #23272a;
+  --ag-input-focus-border-color: #6366f1;
+  --ag-range-selection-background-color: #6366f1;
+  --ag-input-focus-box-shadow: 0 0 0 3px #6366f1;
+  --ag-input-error-focus-box-shadow: 0 0 0 3px #ef4444;
+  --ag-panel-background-color: #23272a;
+  --ag-panel-border-color: #23272a;
+  --ag-menu-background-color: #23272a;
+  --ag-menu-border-color: #23272a;
+  --ag-icon-font-color: #f3f4f6;
+  --ag-find-match-color: #f3f4f6;
+  --ag-find-match-background-color: #6366f1;
+  --ag-find-active-match-color: #f3f4f6;
+  --ag-find-active-match-background-color: #6366f1;
+}

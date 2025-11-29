@@ -1,0 +1,273 @@
+/* Luckysheet styling - TeamForge Dark Theme */
+
+/* ===== TOOLBAR ===== */
+/* Dark toolbar background */
+#luckysheet-toolbar-area,
+#luckysheet-toolbar-area *,
+#luckysheet-toolbar-button-split-left,
+#luckysheet-toolbar-button-split-right,
+.luckysheet-toolbar-menu-button,
+#luckysheet-icon-morebtn-container,
+#luckysheet-toolbar-calculate,
+#luckysheet-toolbar-left-theme,
+#luckysheet-toolbar-right-theme,
+.luckysheet-toolbar-button-split-left,
+.luckysheet-toolbar-button-split-right {
+  background-color: #000000 !important;
+  background: #000000 !important;
+}
+
+/* Specific formatting buttons */
+#luckysheet-icon-bold,
+#luckysheet-icon-italic,
+#luckysheet-icon-strikethrough,
+#luckysheet-icon-underline,
+#luckysheet-icon-font-size,
+#luckysheet-icon-currency,
+#luckysheet-icon-percent,
+#luckysheet-icon-fmt-decimal-increase,
+#luckysheet-icon-fmt-decimal-decrease,
+#luckysheet-icon-paintformat,
+.luckysheet-icon-bold,
+.luckysheet-icon-italic,
+.luckysheet-icon-strikethrough,
+.luckysheet-icon-underline,
+.luckysheet-toolbar-button.luckysheet-inline-block,
+div[id*="luckysheet-icon-"],
+.luckysheet-toolbar-button-outer-box {
+  background-color: #000000 !important;
+  background: #000000 !important;
+}
+
+/* Toolbar text color - white */
+#luckysheet-toolbar-area,
+#luckysheet-toolbar-area *,
+.luckysheet-toolbar-menu-button,
+.luckysheet-toolbar-menu-button *,
+.luckysheet-toolbar-button-outer-box,
+.luckysheet-toolbar-button-outer-box * {
+  color: #ffffff !important;
+}
+
+/* Toolbar with subtle bottom border */
+#luckysheet-toolbar-area {
+  border-bottom: 1px solid #1f2937 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ===== FORMULA BAR ===== */
+#luckysheet-wa-editor,
+#luckysheet-wa-functionbox-container,
+#luckysheet-functionbox-cell,
+#luckysheet-rich-text-editor {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+  border: 1px solid #1f2937 !important;
+  border-radius: 6px !important;
+}
+
+/* ===== GRID AREA ===== */
+#luckysheet-cell-main {
+  background-color: #000000 !important;
+}
+
+/* Cell text styling - white text */
+#luckysheet-cell-main .luckysheet-cells-content,
+#luckysheet-cell-main .luckysheet-grid-container,
+#luckysheet .luckysheet-cell,
+#luckysheet .luckysheet-grid-container .luckysheet-cell-content {
+  color: #ffffff !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif !important;
+}
+
+/* Individual cells - force black background */
+.luckysheet-cell,
+.luckysheet-cell-content,
+.luckysheet-cell div,
+#luckysheet table td,
+#luckysheet-cell-main table td,
+.luckysheet-grid-container canvas+div {
+  background-color: #000000 !important;
+}
+
+/* Cell canvas background */
+#luckysheet-grid-window-1,
+#luckysheet-grid-window-2,
+#luckysheet-grid-window-3,
+#luckysheet-grid-window-4 {
+  background-color: #000000 !important;
+}
+
+/* Input fields */
+#luckysheet-input-box,
+#luckysheet-rich-text-editor {
+  color: #ffffff !important;
+  background-color: #0a0a0a !important;
+  border: 2px solid #3b82f6 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* ===== SHEET TABS ===== */
+.luckysheet-sheets-item {
+  background-color: #1a1a1a !important;
+  border-radius: 6px 6px 0 0 !important;
+  margin-right: 2px !important;
+  transition: background-color 0.15s ease !important;
+}
+
+.luckysheet-sheets-item:hover {
+  background-color: #2a2a2a !important;
+}
+
+.luckysheet-sheets-item span {
+  color: #9ca3af !important;
+  font-weight: 500 !important;
+}
+
+.luckysheet-sheets-item.luckysheet-sheets-active {
+  background-color: #000000 !important;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+.luckysheet-sheets-item.luckysheet-sheets-active span {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+/* ===== STATUS BAR ===== */
+#luckysheet-sta-content {
+  color: #9ca3af !important;
+  background-color: #0a0a0a !important;
+  border-top: 1px solid #1f2937 !important;
+  font-size: 12px !important;
+}
+
+/* ===== DROPDOWNS & MENUS ===== */
+.luckysheet-menuButton,
+.luckysheet-cols-menu,
+.luckysheet-rightclick-menu {
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+  border: 1px solid #2a2a2a !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+}
+
+.luckysheet-menuButton:hover,
+.luckysheet-cols-menu li:hover,
+.luckysheet-rightclick-menu li:hover {
+  background-color: #2a2a2a !important;
+}
+
+/* Menu item text */
+.luckysheet-cols-menu li,
+.luckysheet-rightclick-menu li {
+  color: #ffffff !important;
+}
+
+/* ===== SELECTION & BORDERS ===== */
+.luckysheet-cell-selected .luckysheet-cell-content {
+  color: #ffffff !important;
+}
+
+/* Grid lines - subtle dark lines */
+.luckysheet-cell {
+  border-color: #1a1a1a !important;
+}
+
+/* Row and column headers */
+.luckysheet-cols-h-cells,
+.luckysheet-rows-h {
+  background-color: #0a0a0a !important;
+  color: #9ca3af !important;
+}
+
+.luckysheet-cols-h-cell,
+.luckysheet-rows-h-cell {
+  background-color: #0a0a0a !important;
+  color: #9ca3af !important;
+  border-color: #1a1a1a !important;
+}
+
+/* ===== SCROLLBARS ===== */
+#luckysheet-scrollbar-x,
+#luckysheet-scrollbar-y {
+  background-color: #0a0a0a !important;
+}
+
+.luckysheet-scrollbar-thumb {
+  background-color: #3a3a3a !important;
+  border-radius: 4px !important;
+}
+
+.luckysheet-scrollbar-thumb:hover {
+  background-color: #4a4a4a !important;
+}
+
+/* ===== DIALOGS & MODALS ===== */
+.luckysheet-modal-dialog {
+  background-color: #1a1a1a !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid #2a2a2a !important;
+}
+
+.luckysheet-modal-dialog-title {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid #2a2a2a !important;
+  border-radius: 12px 12px 0 0 !important;
+  font-weight: 600 !important;
+}
+
+.luckysheet-modal-dialog-content {
+  color: #ffffff !important;
+}
+
+/* ===== BUTTONS ===== */
+.luckysheet-button {
+  background-color: #2a2a2a !important;
+  color: #ffffff !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.15s ease !important;
+  border: 1px solid #3a3a3a !important;
+}
+
+.luckysheet-button:hover {
+  background-color: #3a3a3a !important;
+}
+
+.luckysheet-button-primary {
+  background-color: #3b82f6 !important;
+  border: none !important;
+}
+
+.luckysheet-button-primary:hover {
+  background-color: #2563eb !important;
+}
+
+/* ===== SELECTION HIGHLIGHT ===== */
+.luckysheet-selection-highlight {
+  border: 2px solid #3b82f6 !important;
+}
+
+/* ===== CONTEXT MENUS ===== */
+.luckysheet-cols-menu-btn,
+.luckysheet-rightclick-menu li {
+  color: #ffffff !important;
+}
+
+.luckysheet-cols-menu-btn:hover,
+.luckysheet-rightclick-menu li:hover {
+  background-color: #2a2a2a !important;
+}
+
+/* ===== DROPDOWNS SELECT ===== */
+select,
+.luckysheet-select {
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+  border: 1px solid #2a2a2a !important;
+}

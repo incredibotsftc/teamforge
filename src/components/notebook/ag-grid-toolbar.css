@@ -1,0 +1,11 @@
+.ag-toolbar svg {
+  color: inherit;
+}
+.dark .ag-toolbar button {
+  color: #fff;
+  border-color: #333;
+}
+.dark .ag-toolbar button:hover {
+  background: #222;
+  color: #fff;
+}

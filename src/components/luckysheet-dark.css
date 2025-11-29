@@ -1,0 +1,107 @@
+/* luckysheet-dark.css: Custom overrides for Luckysheet dark mode */
+.luckysheet,
+.luckysheet-container,
+.luckysheet-grid-window,
+.luckysheet-sheet,
+.luckysheet-toolbar,
+.luckysheet-sheet-area,
+.luckysheet-sheet-list,
+.luckysheet-info-bar,
+.luckysheet-stat-area,
+.luckysheet-formula-bar-container,
+.luckysheet-cols-menu,
+.luckysheet-cols-h-c,
+.luckysheet-rows-h-c {
+  background: #18181b !important;
+  color: #e5e7eb !important;
+  border-color: #27272a !important;
+}
+
+/* Make individual cells even darker for true dark mode */
+.luckysheet-cell,
+.luckysheet-cell-input {
+  background: #131316 !important;
+  color: #e5e7eb !important;
+  border-color: #27272a !important;
+}
+
+.luckysheet-cell-selected {
+  background: #1e293b !important;
+  border: 1.5px solid #2563eb !important;
+}
+
+.luckysheet-toolbar,
+.luckysheet-sheet-list,
+.luckysheet-info-bar,
+.luckysheet-stat-area,
+.luckysheet-formula-bar-container {
+  background: #23272f !important;
+  color: #e5e7eb !important;
+}
+
+.luckysheet-cell-selected {
+  background: #2563eb22 !important;
+  border: 1.5px solid #2563eb !important;
+}
+
+.luckysheet-cell-input {
+  background: #23272f !important;
+  color: #e5e7eb !important;
+}
+
+.luckysheet-cols-h-c,
+.luckysheet-rows-h-c {
+  background: #23272f !important;
+  color: #e5e7eb !important;
+}
+
+.luckysheet-icon-btn,
+.luckysheet-toolbar-button {
+  background: #23272f !important;
+  color: #e5e7eb !important;
+  border-color: #27272a !important;
+}
+
+.luckysheet-sheet-list-item {
+  background: #23272f !important;
+  color: #e5e7eb !important;
+}
+
+.luckysheet-sheet-list-item-active {
+  background: #2563eb !important;
+  color: #fff !important;
+}
+
+.luckysheet-menu-button {
+  background: #23272f !important;
+  color: #e5e7eb !important;
+}
+
+.luckysheet-modal-dialog {
+  background: #18181b !important;
+  color: #e5e7eb !important;
+}
+
+.luckysheet-modal-dialog .luckysheet-modal-title {
+  color: #e5e7eb !important;
+}
+
+.luckysheet-modal-dialog .luckysheet-modal-content {
+  background: #23272f !important;
+  color: #e5e7eb !important;
+}
+
+.luckysheet-modal-dialog .luckysheet-modal-footer {
+  background: #23272f !important;
+  color: #e5e7eb !important;
+}
+
+.luckysheet-iconfont {
+  color: #e5e7eb !important;
+}
+
+.luckysheet-toolbar-button:hover,
+.luckysheet-icon-btn:hover {
+  background: #2563eb !important;
+  color: #fff !important;
+}
