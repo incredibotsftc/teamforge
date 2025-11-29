@@ -85,6 +85,7 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
 
       const response = await fetch(`/api/public/surveys/${surveyId}/responses`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           answers: answerArray
@@ -130,6 +131,17 @@ export function PublicSurveyForm({ surveyId }: PublicSurveyFormProps) {
             Go to Login
           </Button>
         )}
+      </div>
+    )
+  }
+
+  if (survey.status === 'closed') {
+    return (
+      <div className="w-full py-8 px-4">
+        <div className="max-w-2xl mx-auto text-center border rounded-xl p-12 bg-card shadow-sm">
+          <h1 className="text-2xl font-bold mb-4">Survey Closed</h1>
+          <p className="text-muted-foreground">This survey is no longer accepting responses.</p>
+        </div>
       </div>
     )
   }

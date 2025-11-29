@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { handleAPIError } from '@/lib/api-errors'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,26 @@ export async function POST(
     const { surveyId } = await params
     const body = await request.json()
     const { respondent_name, respondent_email, answers } = body
+    const cookieStore = await cookies()
+
+    // Create a server-side Supabase client that can read cookies
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options: CookieOptions) {
+            cookieStore.set({ name, value, ...options })
+          },
+          remove(name: string, options: CookieOptions) {
+            cookieStore.set({ name, value: '', ...options })
+          },
+        },
+      }
+    )
 
     // First verify the survey exists and is published
     const { data: survey, error: surveyError } = await supabase
