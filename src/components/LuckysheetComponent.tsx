@@ -5,7 +5,7 @@ import 'luckysheet/dist/plugins/css/pluginsCss.css'
 import 'luckysheet/dist/plugins/plugins.css'
 import 'luckysheet/dist/css/luckysheet.css'
 import 'luckysheet/dist/assets/iconfont/iconfont.css'
-import '../components/luckysheet-dark.css'
+import './luckysheet-dark.css'
 
 interface LuckysheetComponentProps {
     containerId?: string
@@ -24,8 +24,76 @@ export default function LuckysheetComponent({
 }: LuckysheetComponentProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const instanceRef = useRef<boolean>(false)
+    const luckysheetAPIRef = useRef<any>(null)
+    const sheetFocusRef = useRef(false)
+    const initialDataRef = useRef<any[] | undefined>(data)
     const [error, setError] = useState<string | null>(null)
     const [scriptsLoaded, setScriptsLoaded] = useState(false)
+    const [luckysheetReady, setLuckysheetReady] = useState(false)
+
+    // Capture external data updates before Luckysheet initializes
+    useEffect(() => {
+        if (!instanceRef.current) {
+            initialDataRef.current = data
+        }
+    }, [data])
+
+    // Track whether Luckysheet currently has focus (for delete autosave handling)
+    useEffect(() => {
+        const handlePointerDown = (event: PointerEvent) => {
+            const container = containerRef.current
+            if (!container) {
+                sheetFocusRef.current = false
+                return
+            }
+            const target = event.target as Node | null
+            sheetFocusRef.current = !!(target && container.contains(target))
+        }
+
+        const handleFocusIn = (event: FocusEvent) => {
+            const container = containerRef.current
+            if (!container) {
+                sheetFocusRef.current = false
+                return
+            }
+            const target = event.target as Node | null
+            sheetFocusRef.current = !!(target && container.contains(target))
+        }
+
+        document.addEventListener('pointerdown', handlePointerDown)
+        document.addEventListener('focusin', handleFocusIn)
+
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown)
+            document.removeEventListener('focusin', handleFocusIn)
+        }
+    }, [])
+
+    // Autosave after delete/backspace clears a cell
+    useEffect(() => {
+        if (!luckysheetReady) return
+
+        const handleKeyUp = (event: KeyboardEvent) => {
+            if (event.key !== 'Delete' && event.key !== 'Backspace') return
+            if (!sheetFocusRef.current) return
+            const api = luckysheetAPIRef.current
+            if (!api || typeof api.getAllSheets !== 'function') return
+
+            requestAnimationFrame(() => {
+                try {
+                    const sheets = api.getAllSheets()
+                    if (onChange) onChange(sheets)
+                } catch (err) {
+                    console.error('Failed to autosave after delete key press:', err)
+                }
+            })
+        }
+
+        window.addEventListener('keyup', handleKeyUp)
+        return () => {
+            window.removeEventListener('keyup', handleKeyUp)
+        }
+    }, [luckysheetReady, onChange])
 
     // Load jQuery and dependencies first
     useEffect(() => {
@@ -99,7 +167,12 @@ export default function LuckysheetComponent({
 
     // Initialize Luckysheet after all scripts are loaded
     useEffect(() => {
-        if (!scriptsLoaded) return
+        if (!scriptsLoaded || instanceRef.current) return
+
+        luckysheetAPIRef.current = null
+        if (luckysheetReady) {
+            setLuckysheetReady(false)
+        }
 
         // Retry mechanism for waiting for spectrum to fully register
         let retryCount = 0
@@ -151,6 +224,13 @@ export default function LuckysheetComponent({
             import('luckysheet')
                 .then((luckysheetModule) => {
                     const luckysheet = luckysheetModule.default || luckysheetModule
+                    luckysheetAPIRef.current = luckysheet
+                    const emitChange = () => {
+                        const api = luckysheetAPIRef.current
+                        if (onChange && api?.getAllSheets) {
+                            onChange(api.getAllSheets())
+                        }
+                    }
 
                     // Destroy existing instance if it exists
                     try {
@@ -166,7 +246,9 @@ export default function LuckysheetComponent({
                     container.innerHTML = ''
 
                     // Default data with dark mode styling
-                    const defaultData = data || [
+                    const defaultData = (initialDataRef.current && initialDataRef.current.length
+                        ? initialDataRef.current
+                        : [
                         {
                             name: 'Sheet1',
                             color: '',
@@ -196,7 +278,7 @@ export default function LuckysheetComponent({
                             },
                             index: '0',
                         },
-                    ]
+                    ])
 
                     try {
                         luckysheet.create({
@@ -253,16 +335,44 @@ export default function LuckysheetComponent({
                             },
                             hook: {
                                 cellUpdated: (r: number, c: number, oldValue: any, newValue: any) => {
-                                    if (onChange && luckysheet.getAllSheets) {
-                                        // Trigger onChange with current workbook data
-                                        onChange(luckysheet.getAllSheets())
-                                    }
+                                    console.log('🔄 cellUpdated hook called', { r, c, oldValue, newValue })
+                                    emitChange()
+                                },
+                                rangeSelect: function (range: any) {
+                                    console.log('📌 rangeSelect hook called', range)
+                                },
+                                rangeClear: function (range: any) {
+                                    console.log('🗑️ rangeClear hook called', range)
+                                    emitChange()
+                                },
+                                rangePasteBefore: function (range: any) {
+                                    console.log('📋 rangePasteBefore hook called', range)
+                                },
+                                rangePaste: function (range: any) {
+                                    console.log('✅ rangePaste hook called', range)
+                                    emitChange()
+                                },
+                                rangeCutPaste: function (range: any) {
+                                    console.log('✂️ rangeCutPaste hook called', range)
+                                    emitChange()
+                                },
+                                rangeDelete: function (range: any) {
+                                    console.log('❌ rangeDelete hook called', range)
+                                    emitChange()
+                                },
+                                sheetEditBefore: function (range: any) {
+                                    console.log('📝 sheetEditBefore hook called', range)
+                                },
+                                sheetEditAfter: function (range: any) {
+                                    console.log('✏️ sheetEditAfter hook called', range)
+                                    emitChange()
                                 },
                             },
                         })
 
                         console.log('✅ Luckysheet initialized successfully!')
                         instanceRef.current = true
+                        setLuckysheetReady(true)
                     } catch (err) {
                         console.error('❌ Luckysheet initialization error:', err)
                         setError(`Initialization failed: ${err}`)
@@ -281,7 +391,7 @@ export default function LuckysheetComponent({
         return () => {
             // Cleanup handled by instance ref and destroy in next initialization
         }
-    }, [scriptsLoaded, containerId, data, onChange])
+    }, [scriptsLoaded, containerId, onChange, luckysheetReady])
 
     if (error) {
         return (
@@ -295,27 +405,38 @@ export default function LuckysheetComponent({
         )
     }
 
-    if (!scriptsLoaded) {
-        return (
-            <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Loading spreadsheet dependencies...</p>
-            </div>
-        )
-    }
-
     return (
-        <div
-            id={containerId}
-            ref={containerRef}
-            style={{
-                margin: '0px',
-                padding: '0px',
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: typeof width === 'number' ? `${width}px` : width,
-                height: typeof height === 'number' ? `${height}px` : height,
-            }}
-        />
+        <div style={{ position: 'relative', width: typeof width === 'number' ? `${width}px` : width, height: typeof height === 'number' ? `${height}px` : height }}>
+            <div
+                id={containerId}
+                ref={containerRef}
+                style={{
+                    margin: '0px',
+                    padding: '0px',
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: '100%',
+                    height: '100%',
+                }}
+            />
+            {!scriptsLoaded && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(24,24,27,0.96)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#e5e7eb',
+                        fontSize: 14,
+                        letterSpacing: 0.2,
+                    }}
+                >
+                    Loading spreadsheet dependencies...
+                </div>
+            )}
+        </div>
     )
 }

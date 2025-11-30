@@ -24,11 +24,6 @@ import { cn } from '@/lib/utils'
 // Dynamically import Luckysheet component (client-side only)
 const LuckysheetComponent = dynamic(() => import('@/components/LuckysheetComponent'), {
   ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full">
-      <p className="text-muted-foreground">Loading spreadsheet...</p>
-    </div>
-  ),
 })
 
 export default function SheetPage() {
@@ -50,52 +45,52 @@ export default function SheetPage() {
     }
   }, [sheets, selectedSheet])
 
-  // Manual save function
-  const handleManualSave = useCallback(() => {
-    if (!selectedSheet || !team || !currentSeason || !user) {
-      console.error('Cannot save: missing required data', { selectedSheet, team, currentSeason, user })
-      return
-    }
+  // // Manual save function
+  // const handleManualSave = useCallback(() => {
+  //   if (!selectedSheet || !team || !currentSeason || !user) {
+  //     console.error('Cannot save: missing required data', { selectedSheet, team, currentSeason, user })
+  //     return
+  //   }
 
-    // Get current workbook data from Luckysheet
-    const workbookData = (window as any).luckysheet?.getAllSheets?.()
+  //   // Get current workbook data from Luckysheet
+  //   const workbookData = (window as any).luckysheet?.getAllSheets?.()
 
-    if (!workbookData) {
-      console.error('Cannot get workbook data from Luckysheet')
-      return
-    }
+  //   if (!workbookData) {
+  //     console.error('Cannot get workbook data from Luckysheet')
+  //     return
+  //   }
 
-    console.log('Manual save triggered', {
-      pageId: selectedSheet.id,
-      title: sheetTitle,
-      workbookSheetCount: workbookData.length
-    })
+  //   console.log('Manual save triggered', {
+  //     pageId: selectedSheet.id,
+  //     title: sheetTitle,
+  //     workbookSheetCount: workbookData.length
+  //   })
 
-    setIsSaving(true)
-    saveLuckysheet(
-      {
-        pageId: selectedSheet.id,
-        teamId: team.id,
-        seasonId: currentSeason.id,
-        workbookData,
-        userId: user.id,
-        metadata: { title: sheetTitle },
-      },
-      {
-        onSuccess: () => {
-          console.log('✅ Save successful!')
-          setIsSaving(false)
-          setLastSaved(new Date())
-          refetchSheets()
-        },
-        onError: (error) => {
-          console.error('❌ Save failed:', error)
-          setIsSaving(false)
-          alert(`Failed to save sheet: ${error.message}`)
-        },
-      }
-    )
-  }, [selectedSheet, team, currentSeason, user, sheetTitle, saveLuckysheet, refetchSheets])
+  //   setIsSaving(true)
+  //   saveLuckysheet(
+  //     {
+  //       pageId: selectedSheet.id,
+  //       teamId: team.id,
+  //       seasonId: currentSeason.id,
+  //       workbookData,
+  //       userId: user.id,
+  //       metadata: { title: sheetTitle },
+  //     },
+  //     {
+  //       onSuccess: () => {
+  //         console.log('✅ Save successful!')
+  //         setIsSaving(false)
+  //         setLastSaved(new Date())
+  //         // Don't refetch to avoid black screen
+  //       },
+  //       onError: (error) => {
+  //         console.error('❌ Save failed:', error)
+  //         setIsSaving(false)
+  //         alert(`Failed to save sheet: ${error.message}`)
+  //       },
+  //     }
+  //   )
+  // }, [selectedSheet, team, currentSeason, user, sheetTitle, saveLuckysheet, refetchSheets])
 
   // Debounced save function (for auto-save)
   const debouncedSave = useDebouncedCallback(
@@ -118,7 +113,7 @@ export default function SheetPage() {
             console.log('✅ Auto-save successful!')
             setIsSaving(false)
             setLastSaved(new Date())
-            refetchSheets()
+            // Don't refetch to avoid black screen
           },
           onError: (error) => {
             console.error('❌ Auto-save failed:', error)
@@ -204,7 +199,7 @@ export default function SheetPage() {
   // Action buttons for the top navigation
   const actionButtons = (
     <div className="flex items-center gap-2">
-      {selectedSheet && (
+      {/* {selectedSheet && (
         <Button
           variant="default"
           size="sm"
@@ -214,7 +209,7 @@ export default function SheetPage() {
           <Save className="w-4 h-4 mr-2" />
           {isSaving ? 'Saving...' : 'Save'}
         </Button>
-      )}
+      )} */}
       <Button variant="default" size="sm" className="btn-accent" onClick={handleCreateSheet}>
         <Plus className="w-4 h-4 mr-2" />
         New Sheet

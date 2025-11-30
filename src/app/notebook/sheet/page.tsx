@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { Table, Plus, FileSpreadsheet, Trash2, MoreVertical, Save } from 'lucide-react'
+import { Table, Plus, FileSpreadsheet, Trash2, MoreVertical } from 'lucide-react'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import dynamic from 'next/dynamic'
@@ -49,53 +49,6 @@ export default function SheetPage() {
       setSheetTitle(sheets[0].title)
     }
   }, [sheets, selectedSheet])
-
-  // Manual save function
-  const handleManualSave = useCallback(() => {
-    if (!selectedSheet || !team || !currentSeason || !user) {
-      console.error('Cannot save: missing required data', { selectedSheet, team, currentSeason, user })
-      return
-    }
-
-    // Get current workbook data from Luckysheet
-    const workbookData = (window as any).luckysheet?.getAllSheets?.()
-
-    if (!workbookData) {
-      console.error('Cannot get workbook data from Luckysheet')
-      return
-    }
-
-    console.log('Manual save triggered', {
-      pageId: selectedSheet.id,
-      title: sheetTitle,
-      workbookSheetCount: workbookData.length
-    })
-
-    setIsSaving(true)
-    saveLuckysheet(
-      {
-        pageId: selectedSheet.id,
-        teamId: team.id,
-        seasonId: currentSeason.id,
-        workbookData,
-        userId: user.id,
-        metadata: { title: sheetTitle },
-      },
-      {
-        onSuccess: () => {
-          console.log('✅ Save successful!')
-          setIsSaving(false)
-          setLastSaved(new Date())
-          refetchSheets()
-        },
-        onError: (error) => {
-          console.error('❌ Save failed:', error)
-          setIsSaving(false)
-          alert(`Failed to save sheet: ${error.message}`)
-        },
-      }
-    )
-  }, [selectedSheet, team, currentSeason, user, sheetTitle, saveLuckysheet, refetchSheets])
 
   // Debounced save function (for auto-save)
   const debouncedSave = useDebouncedCallback(
@@ -204,17 +157,6 @@ export default function SheetPage() {
   // Action buttons for the top navigation
   const actionButtons = (
     <div className="flex items-center gap-2">
-      {selectedSheet && (
-        <Button
-          variant="default"
-          size="sm"
-          onClick={handleManualSave}
-          disabled={isSaving}
-        >
-          <Save className="w-4 h-4 mr-2" />
-          {isSaving ? 'Saving...' : 'Save'}
-        </Button>
-      )}
       <Button variant="default" size="sm" className="btn-accent" onClick={handleCreateSheet}>
         <Plus className="w-4 h-4 mr-2" />
         New Sheet
